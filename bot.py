@@ -6,9 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
 
-# --- ВСТАВЬ СВОЙ ТОКЕН ---
-import os
-TOKEN = os.getenv("8274918323:AAH4Ae4N_xNhfDW4MIucDm0hRi9jhtppmbE")
+TOKEN = os.getenv("BOT_TOKEN")  # имя переменной окружения
 bot = telebot.TeleBot(TOKEN)
 # --------------------------
 
