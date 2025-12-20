@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import requests
@@ -6,7 +7,9 @@ from urllib.parse import quote
 import telebot
 
 # --- ВСТАВЬ СВОЙ ТОКЕН ---
-TOKEN = "8274918323:AAF2tC2tb_6TvblGuW1FIBTGggCCHN52hUk"
+import os
+TOKEN = os.getenv("8274918323:AAH4Ae4N_xNhfDW4MIucDm0hRi9jhtppmbE")
+bot = telebot.TeleBot(TOKEN)
 # --------------------------
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
