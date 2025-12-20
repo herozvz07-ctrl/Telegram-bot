@@ -6,23 +6,17 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
 
-TOKEN = os.getenv("BOT_TOKEN")  # имя переменной окружения
+# ─── Токен берём из переменной окружения ───
+TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
-# --------------------------
-
-bot = telebot.TeleBot(TOKEN, parse_mode=None)
+# ──────────────────────────────────────────
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 }
 
-MENU_WORDS = {
-    "le navigation","rucoy online","welcome","news","highscores",
-    "characters","guilds","sign in","sign in with google","sign in with apple"
-}
-
-
+# === Функции для обработки информации о гильдиях ===
 def remove_adjacent_duplicates(lines):
     if not lines:
         return lines
@@ -31,7 +25,6 @@ def remove_adjacent_duplicates(lines):
         if ln != out[-1]:
             out.append(ln)
     return out
-
 
 def remove_repeated_block(lines):
     n = len(lines)
@@ -44,92 +37,32 @@ def remove_repeated_block(lines):
             return lines[0:k] + lines[2*k:]
     return lines
 
+# === Обработчики команд ===
 
-def extract_description(soup, guild_name_raw):
-    page_text = soup.get_text("\n", strip=True)
-    idx = page_text.lower().find(guild_name_raw.lower())
-    chunk = ""
-    if idx != -1:
-        start = idx + len(guild_name_raw)
-        m = re.search(r"(Founded on|Members)\b", page_text[start:], re.I)
-        end = start + m.start() if m else len(page_text)
-        chunk = page_text[start:end].strip()
-    else:
-        h1 = soup.find("h1")
-        if h1:
-            pieces = []
-            for elem in h1.next_elements:
-                t = elem.strip() if isinstance(elem, str) else elem.get_text(" ", strip=True)
-                if not t:
-                    continue
-                if re.search(r"(Founded on|Members)\b", t, re.I):
-                    break
-                pieces.append(t)
-            chunk = " ".join(pieces).strip()
-    if not chunk:
-        return "Нет описания"
-    lines = [ln.strip() for ln in re.split(r"\n+", chunk) if ln.strip()]
-    filtered = []
-    for ln in lines:
-        low = ln.lower()
-        if any(menu in low for menu in MENU_WORDS):
-            continue
-        if low == guild_name_raw.lower():
-            continue
-        filtered.append(ln)
-    filtered = remove_adjacent_duplicates(filtered)
-    filtered = remove_repeated_block(filtered)
-    return "\n".join(filtered).strip() if filtered else "Нет описания"
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.reply_to(message, "👋 Добавь меня в чат, чтобы я начал работать!")
 
-
-def extract_guild_info_from_soup(soup, guild_name_raw):
-    page_text = soup.get_text("\n", strip=True)
-    pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
-
-    description = extract_description(soup, guild_name_raw)
-
-    created = None
-    m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
-    if m_created:
-        created = m_created.group(1).strip()
-
-    members_count = None
-    table = soup.find("table")
-    if table:
-        rows = table.find_all("tr")
-        num = sum(1 for r in rows if r.find_all("td"))
-        if num > 0:
-            members_count = str(num)
-
-    if not created and not members_count:
-        return None
-
-    return {
-        "title": pretty_title,
-        "description": description if description else "Нет описания",
-        "created": created if created else "Не указано",
-        "members_count": members_count if members_count else "Не указано"
-    }
-
-
+# Пример обработчика гильдии
 @bot.message_handler(commands=['guild'])
 def handle_guild(message):
     try:
         parts = message.text.split(" ", 1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например /guild Imperia Of Titans")
+            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например /guild HeroGuild")
             return
         guild_name_raw = parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"
+        url = f"https://www.rucoyonline.com/guilds/{encoded}"
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
-            bot.reply_to(message, "Гильдия не найдено 📛")
+            bot.reply_to(message, "Гильдия не найдена 📛")
             return
         soup = BeautifulSoup(resp.text, "html.parser")
+        # Здесь должна быть функция extract_guild_info_from_soup
         info = extract_guild_info_from_soup(soup, guild_name_raw)
         if not info:
-            bot.reply_to(message, "Гильдия не найдено 📛")
+            bot.reply_to(message, "Гильдия не найдена 📛")
             return
 
         desc = info["description"]
@@ -151,7 +84,7 @@ def handle_guild(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
-
+# Обработчик пользователей
 @bot.message_handler(commands=['user'])
 def handle_user(message):
     try:
@@ -199,12 +132,7 @@ def handle_user(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
-
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    bot.reply_to(message, "👋 Добавь меня в чат, чтобы я начал работать!")
-
-
+# === Запуск бота ===
 if __name__ == "__main__":
     print("Бот запущен...")
     while True:
