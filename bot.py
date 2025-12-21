@@ -20,129 +20,209 @@ HEADERS = {
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 }
 
-# 🧩 Команда /start
-@bot.message_handler(commands=["start"])
-def start_message(message):
+# ------------------------- /START -------------------------
+@bot.message_handler(commands=['start'])
+def send_start(message):
     bot.reply_to(
         message,
         "👋 Добавь меня в чат, чтобы я начал работать!\n\n"
         "🔹 Доступные команды:\n"
         "`/user <ник>` — Информация об игроке\n"
-        "`/guild <название>` — Информация о гильдии",
-        parse_mode="Markdown"
+        "`/guild <название>` — Информация о гильдии"
     )
 
-# ⚔️ Команда /guild
-@bot.message_handler(commands=["guild"])
+# ------------------------- HELPERS для /GUILD -------------------------
+def remove_adjacent_duplicates(lines):
+    if not lines:
+        return lines
+    out = [lines[0]]
+    for ln in lines[1:]:
+        if ln != out[-1]:
+            out.append(ln)
+    return out
+
+def remove_repeated_block(lines):
+    n = len(lines)
+    if n < 2:
+        return lines
+    for k in range(1, n//2 + 1):
+        if n >= 2*k and lines[0:k] == lines[k:2*k]:
+            return lines[0:k] + lines[2*k:]
+    return lines
+
+def extract_description(soup, guild_name_raw):
+    page_text = soup.get_text("\n", strip=True)
+    idx = page_text.lower().find(guild_name_raw.lower())
+    chunk = ""
+    if idx != -1:
+        start = idx + len(guild_name_raw)
+        m = re.search(r"(Founded on|Members)\b", page_text[start:], re.I)
+        end = start + m.start() if m else len(page_text)
+        chunk = page_text[start:end].strip()
+    else:
+        h1 = soup.find("h1")
+        if h1:
+            pieces = []
+            for elem in h1.next_elements:
+                if isinstance(elem, str):
+                    t = elem.strip()
+                else:
+                    t = elem.get_text(" ", strip=True)
+                if not t:
+                    continue
+                if re.search(r"(Founded on|Members)\b", t, re.I):
+                    break
+                pieces.append(t)
+            chunk = " ".join(pieces).strip()
+
+    if not chunk:
+        return "Нет описания"
+
+    lines = [ln.strip() for ln in re.split(r"\n+", chunk) if ln.strip()]
+    filtered = []
+    for ln in lines:
+        low = ln.lower()
+        if low == guild_name_raw.lower():
+            continue
+        filtered.append(ln)
+
+    filtered = remove_adjacent_duplicates(filtered)
+    filtered = remove_repeated_block(filtered)
+    desc = "\n".join(filtered).strip()
+    return desc if desc else "Нет описания"
+
+def extract_guild_info_from_soup(soup, guild_name_raw):
+    page_text = soup.get_text("\n", strip=True)
+    pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
+    description = extract_description(soup, guild_name_raw)
+
+    created = "Не указано"
+    m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
+    if m_created:
+        created = m_created.group(1).strip()
+
+    members_count = "Не указано"
+    table = soup.find("table")
+    if table:
+        rows = table.find_all("tr")
+        num = sum(1 for r in rows if r.find_all("td"))
+        members_count = str(num) if num > 0 else "Не указано"
+
+    # Если нет даты и участников → гильдия не существует
+    if created == "Не указано" and members_count == "Не указано":
+        return None
+
+    return {
+        "title": pretty_title,
+        "description": description,
+        "created": created,
+        "members_count": members_count
+    }
+
+# ------------------------- /GUILD -------------------------
+@bot.message_handler(commands=['guild'])
 def handle_guild(message):
     try:
-        cmd_parts = message.text.split(" ", 1)
-        if len(cmd_parts) < 2:
+        text = message.text or ""
+        parts = text.split(" ", 1)
+        if len(parts) < 2 or not parts[1].strip():
             bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Lotus`")
             return
 
-        guild_name_raw = cmd_parts[1].strip()
+        guild_name_raw = parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"  # верный URL
+        url = f"https://www.rucoyonline.com/guild/{encoded}"
 
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             bot.reply_to(message, "📛 Гильдия не найдена.")
             return
 
         soup = BeautifulSoup(resp.text, "html.parser")
+        info = extract_guild_info_from_soup(soup, guild_name_raw)
+        if not info:
+            bot.reply_to(message, "📛 Гильдия не найдена.")
+            return
 
-        # --- Извлечение данных ---
-        name = " ".join(w.capitalize() for w in guild_name_raw.split())
+        desc = info["description"].strip()
+        show_description = bool(desc and desc.lower() != "нет описания")
+        desc = desc.replace("```", "`\u200b``")
+        description_block = f"```\n{desc}\n```" if show_description else ""
 
-        # Дата создания
-        m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", soup.get_text("\n", strip=True))
-        created = m_created.group(1).strip() if m_created else "Не указано"
+        reply_lines = [
+            f"⚔️ Guild: *{info['title']}*",
+            f"👥 Members: *{info['members_count']}*",
+            f"📅 Created on: *{info['created']}*",
+        ]
+        if show_description:
+            reply_lines.append("📝 Description:")
+            reply_lines.append(description_block)
+        reply_lines.append(f"🔗 Ссылка: {url}")
 
-        # Кол-во участников
-        table = soup.find("table")
-        members = "Не указано"
-        if table:
-            rows = table.find_all("tr")
-            num = sum(1 for r in rows if r.find_all("td"))
-            members = str(num)
-
-        # Описание гильдии (универсально)
-        desc = "Нет описания"
-        divs = soup.find_all("div")
-        for d in divs:
-            text = d.get_text(" ", strip=True)
-            if text and not re.search(r"(Founded on|Members)", text, re.I) and len(text) > 20:
-                desc = text
-                break
-
-        info_text = (
-            f"⚔️ Guild: *{name}*\n"
-            f"👥 Members: *{members}*\n"
-            f"📅 Created on: *{created}*\n"
-            f"📝 Description: {desc}\n"
-            f"🔗 Ссылка: {url}"
-        )
-
-        bot.reply_to(message, info_text)
+        reply = "\n".join(reply_lines)
+        bot.reply_to(message, reply, parse_mode="Markdown", disable_web_page_preview=True)
 
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
-# 👤 Команда /user
-@bot.message_handler(commands=["user"])
+# ------------------------- /USER -------------------------
+@bot.message_handler(commands=['user'])
 def handle_user(message):
     try:
-        cmd_parts = message.text.split(" ", 1)
-        if len(cmd_parts) < 2:
-            bot.reply_to(message, "⚠️ Укажи ник игрока, например:\n`/user Hero Of Titan`")
+        text = message.text or ""
+        parts = text.split(" ", 1)
+        if len(parts) < 2 or not parts[1].strip():
+            bot.reply_to(message, "⚠️ Укажи ник игрока после команды, например:\n`/user Hero Of Titan`")
             return
 
-        username = cmd_parts[1].strip()
-        encoded = quote(username, safe="")
+        username_raw = parts[1].strip()
+        encoded = quote(username_raw, safe="")
         url = f"https://www.rucoyonline.com/characters/{encoded}"
 
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             bot.reply_to(message, "📛 Игрок не найден.")
             return
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        page_text = soup.get_text("\n", strip=True)
+        char_table = soup.find("table")
+        if not char_table:
+            bot.reply_to(message, "📛 Информация о игроке не найдена.")
+            return
 
-        # --- Извлечение информации ---
-        name_match = re.search(r"Name\s+([A-Za-z0-9 _]+)", page_text)
-        level_match = re.search(r"Level\s+(\d+)", page_text)
-        guild_match = re.search(r"Guild\s+([A-Za-z0-9 _]+)", page_text)
-        online_match = re.search(r"Last online\s+([A-Za-z0-9 ,]+)", page_text)
-        born_match = re.search(r"Born\s+([A-Za-z0-9 ,]+)", page_text)
+        data = {}
+        for row in char_table.find_all("tr"):
+            cols = row.find_all("td")
+            if len(cols) == 2:
+                key = cols[0].get_text(strip=True)
+                value = cols[1].get_text(strip=True)
+                data[key] = value
 
-        name = name_match.group(1).strip() if name_match else username
-        lvl = level_match.group(1).strip() if level_match else "?"
-        guild = guild_match.group(1).strip() if guild_match else "Без гильдии"
-        online = online_match.group(1).strip() if online_match else "Неизвестно"
-        born = born_match.group(1).strip() if born_match else "Неизвестно"
+        nik = data.get("Name", username_raw)
+        lvl = data.get("Level", "Не указано")
+        guild = data.get("Guild", "Нет гильдии")
+        online = data.get("Last online", "Не указано")
+        born = data.get("Born", "Не указано")
 
         reply = (
-            f"👤 Nik: *{name}*\n"
-            f"📊 LvL: *{lvl}*\n"
-            f"⚔️ Гильдия: *{guild}*\n"
-            f"🟢 Online: *{online}*\n"
-            f"📅 Создан: *{born}*\n"
+            f"👤 Nik: {nik}\n"
+            f"📊 LvL: {lvl}\n"
+            f"⚔️ Гильдия: {guild}\n"
+            f"🟢 Online: {online}\n"
+            f"📅 Создан: {born}\n"
             f"🔗 Ссылка: {url}"
         )
-
         bot.reply_to(message, reply)
 
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
-# 🚀 Запуск бота
+# ------------------------- MAIN -------------------------
 if __name__ == "__main__":
     print("Бот запущен...")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as ex:
-            print("Ошибка:", ex)
+            print("Polling crashed:", ex)
             time.sleep(3)
