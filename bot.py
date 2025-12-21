@@ -155,7 +155,7 @@ def handle_user(message):
         encoded_name = quote(username_raw, safe="")
         
         # Собираем ссылку максимально аккуратно
-        base_url = "[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/)"
+        base_url = "https://www.rucoyonline.com/characters/"
         full_url = (base_url + encoded_name).strip()
 
         resp = requests.get(full_url, headers=HEADERS, timeout=12)
