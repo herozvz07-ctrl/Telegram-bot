@@ -20,9 +20,10 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "Bot is alive!"
 
 def run_web_server():
+    # Render сам назначит порт, обычно 10000 или 8080
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -42,12 +43,7 @@ MENU_WORDS = {
     "characters","guilds","sign in","sign in with google","sign in with apple"
 }
 
-# ------------------------- START -------------------------
-@bot.message_handler(commands=['start'])
-def send_start(message):
-    bot.reply_to(message, "Добавь меня в чат, чтобы я начал работать!")
-
-# ------------------------- /GUILD -------------------------
+# ------------------------- Вспомогательные функции -------------------------
 def remove_adjacent_duplicates(lines):
     if not lines: return lines
     out = [lines[0]]
@@ -92,22 +88,12 @@ def extract_description(soup, guild_name_raw):
     desc = "\n".join(filtered).strip()
     return desc if desc else "Нет описания"
 
-def extract_guild_info_from_soup(soup, guild_name_raw):
-    page_text = soup.get_text("\n", strip=True)
-    pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
-    description = extract_description(soup, guild_name_raw)
-    created = "Не указано"
-    m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
-    if m_created: created = m_created.group(1).strip()
-    members_count = "Не указано"
-    table = soup.find("table")
-    if table:
-        rows = table.find_all("tr")
-        num = sum(1 for r in rows if r.find_all("td"))
-        members_count = str(num) if num > 0 else "Не указано"
-    if created == "Не указано" and members_count == "Не указано": return None
-    return {"title": pretty_title, "description": description, "created": created, "members_count": members_count}
+# ------------------------- START -------------------------
+@bot.message_handler(commands=['start'])
+def send_start(message):
+    bot.reply_to(message, "Бот запущен и готов к работе! Доступные команды: /user и /guild")
 
+# ------------------------- /GUILD -------------------------
 @bot.message_handler(commands=['guild'])
 def handle_guild(message):
     try:
@@ -116,29 +102,46 @@ def handle_guild(message):
         if len(parts) < 2:
             bot.reply_to(message, "⚠️ Укажи название гильдии.")
             return
+        
         guild_name_raw = parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"
+        url = f"https://www.rucoyonline.com/guild/{encoded}".strip()
+        
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             bot.reply_to(message, "Гильдия не найдена 📛")
             return
+        
         soup = BeautifulSoup(resp.text, "html.parser")
-        info = extract_guild_info_from_soup(soup, guild_name_raw)
-        if not info:
-            bot.reply_to(message, "Гильдия не найдена 📛")
-            return
-        desc = info["description"].strip().replace("```", "`\u200b``")
-        show_desc = bool(desc and desc.lower() != "нет описания")
-        reply = [f"⚔️ Guild: *{info['title']}*", f"👥 Members: *{info['members_count']}*", f"📅 Create on: *{info['created']}*"]
+        page_text = soup.get_text("\n", strip=True)
+        
+        pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
+        description = extract_description(soup, guild_name_raw)
+        
+        created = "Не указано"
+        m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
+        if m_created: created = m_created.group(1).strip()
+        
+        members_count = "Не указано"
+        table = soup.find("table")
+        if table:
+            rows = table.find_all("tr")
+            num = sum(1 for r in rows if r.find_all("td"))
+            members_count = str(num) if num > 0 else "Не указано"
+
+        desc_clean = description.replace("```", "`\u200b``")
+        show_desc = bool(desc_clean and desc_clean.lower() != "нет описания")
+        
+        reply = [f"⚔️ Guild: *{pretty_title}*", f"👥 Members: *{members_count}*", f"📅 Created on: *{created}*"]
         if show_desc:
-            reply.extend(["📝 Описание:", f"```\n{desc}\n```"])
+            reply.extend(["📝 Описание:", f"```\n{desc_clean}\n```"])
         reply.append(f"🔗 Ссылка: {url}")
+        
         bot.reply_to(message, "\n".join(reply), parse_mode="Markdown", disable_web_page_preview=True)
     except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
+        bot.reply_to(message, f"❌ Ошибка в /guild: {str(e)}")
 
-# ------------------------- /USER (ИСПРАВЛЕНО) -------------------------
+# ------------------------- /USER -------------------------
 @bot.message_handler(commands=['user'])
 def handle_user(message):
     try:
@@ -149,11 +152,13 @@ def handle_user(message):
             return
 
         username_raw = parts[1].strip()
-        encoded = quote(username_raw, safe="")
-        # Чистая ссылка без лишних символов
-        url = f"[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/){encoded}"
+        encoded_name = quote(username_raw, safe="")
+        
+        # Собираем ссылку максимально аккуратно
+        base_url = "[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/)"
+        full_url = (base_url + encoded_name).strip()
 
-        resp = requests.get(url, headers=HEADERS, timeout=12)
+        resp = requests.get(full_url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             bot.reply_to(message, "Игрок не найден 📛")
             return
@@ -178,21 +183,23 @@ def handle_user(message):
             f"⚔️ Гильдия: {data.get('Guild', 'Нет гильдии')}\n"
             f"🟢 Online: {data.get('Last online', 'Не указано')}\n"
             f"📅 Создан: {data.get('Born', 'Не указано')}\n"
-            f"🔗 Ссылка: {url}"
+            f"🔗 Ссылка: {full_url}"
         )
         bot.reply_to(message, reply, disable_web_page_preview=True)
 
     except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
+        bot.reply_to(message, f"❌ Ошибка в /user: {str(e)}")
 
 # ------------------------- MAIN -------------------------
 if __name__ == "__main__":
     keep_alive() # Запуск веб-сервера для Render
-    print("Бот запущен...")
+    print("Бот запущен и веб-сервер активен...")
+    
     while True:
         try:
+            # infinity_polling сам перезапускается при ошибках сети
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as ex:
-            print("Polling crashed:", ex)
-            time.sleep(3)
-    
+            print(f"Polling error: {ex}")
+            time.sleep(5)
+            
