@@ -48,7 +48,7 @@ def handle_guild(message):
 
         guild_name_raw = cmd_parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guilds/{encoded}"
+        url = f"https://www.rucoyonline.com/guild/{encoded}"
 
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if resp.status_code != 200:
