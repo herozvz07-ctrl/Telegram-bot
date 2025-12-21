@@ -20,11 +20,6 @@ HEADERS = {
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 }
 
-# 🖼️ Картинки для гильдий
-GUILD_IMAGES = {
-    "Imperia Of Titans": "https://i.ibb.co/mFGj0sVq/logo.jpg"
-}
-
 # 🧩 Команда /start
 @bot.message_handler(commands=["start"])
 def start_message(message):
@@ -43,12 +38,12 @@ def handle_guild(message):
     try:
         cmd_parts = message.text.split(" ", 1)
         if len(cmd_parts) < 2:
-            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Imperia Of Titans`")
+            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Lotus`")
             return
 
         guild_name_raw = cmd_parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"
+        url = f"https://www.rucoyonline.com/guild/{encoded}"  # исправленный URL
 
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if resp.status_code != 200:
@@ -91,17 +86,7 @@ def handle_guild(message):
             f"🔗 Ссылка: {url}"
         )
 
-        # Картинка, если есть
-        img_url = GUILD_IMAGES.get(name)
-        if img_url:
-            bot.send_photo(
-                message.chat.id,
-                img_url,
-                caption=info_text,
-                parse_mode="Markdown"
-            )
-        else:
-            bot.reply_to(message, info_text)
+        bot.reply_to(message, info_text)
 
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
