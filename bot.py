@@ -5,13 +5,33 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
+from flask import Flask        # Добавлено для Render
+from threading import Thread    # Добавлено для Render
 
-# 🔑 Токен теперь берётся из переменной окружения
+# 🔑 Токен и Настройки
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
+
+# --- БЛОК ДЛЯ RENDER (WEB SERVER) ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_web_server():
+    # Render автоматически назначает порт через переменную среды PORT
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_web_server)
+    t.daemon = True # Поток умрет вместе с основным кодом
+    t.start()
+# ------------------------------------
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -174,7 +194,7 @@ def handle_user(message):
 
         username_raw = parts[1].strip()
         encoded = quote(username_raw, safe="")
-        url = f"https://www.rucoyonline.com/characters/{encoded}"
+        url = f"[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/){encoded}"
 
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
@@ -216,6 +236,9 @@ def handle_user(message):
 
 # ------------------------- MAIN -------------------------
 if __name__ == "__main__":
+    # Сначала запускаем веб-сервер для Render
+    keep_alive()
+    
     print("Бот запущен...")
     while True:
         try:
