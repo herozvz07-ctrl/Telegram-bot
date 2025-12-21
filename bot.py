@@ -6,32 +6,29 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
 
-# 🔑 Получаем токен из переменной окружения
+# 🔑 Токен теперь берётся из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
-# Создаём объект бота
-bot = telebot.TeleBot(TOKEN, parse_mode="Markdown")
+bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# 🧠 Настройки заголовков
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 }
 
-# ------------------------- /START -------------------------
+MENU_WORDS = {
+    "le navigation","rucoy online","welcome","news","highscores",
+    "characters","guilds","sign in","sign in with google","sign in with apple"
+}
+
+# ------------------------- START -------------------------
 @bot.message_handler(commands=['start'])
 def send_start(message):
-    bot.reply_to(
-        message,
-        "👋 Добавь меня в чат, чтобы я начал работать!\n\n"
-        "🔹 Доступные команды:\n"
-        "`/user <ник>` — Информация об игроке\n"
-        "`/guild <название>` — Информация о гильдии"
-    )
+    bot.reply_to(message, "Добавь меня в чат, чтобы я начал работать!")
 
-# ------------------------- HELPERS для /GUILD -------------------------
+# ------------------------- /GUILD -------------------------
 def remove_adjacent_duplicates(lines):
     if not lines:
         return lines
@@ -82,6 +79,8 @@ def extract_description(soup, guild_name_raw):
     filtered = []
     for ln in lines:
         low = ln.lower()
+        if any(menu in low for menu in MENU_WORDS):
+            continue
         if low == guild_name_raw.lower():
             continue
         filtered.append(ln)
@@ -108,7 +107,6 @@ def extract_guild_info_from_soup(soup, guild_name_raw):
         num = sum(1 for r in rows if r.find_all("td"))
         members_count = str(num) if num > 0 else "Не указано"
 
-    # Если нет даты и участников → гильдия не существует
     if created == "Не указано" and members_count == "Не указано":
         return None
 
@@ -119,14 +117,13 @@ def extract_guild_info_from_soup(soup, guild_name_raw):
         "members_count": members_count
     }
 
-# ------------------------- /GUILD -------------------------
 @bot.message_handler(commands=['guild'])
 def handle_guild(message):
     try:
         text = message.text or ""
         parts = text.split(" ", 1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Lotus`")
+            bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Imperia Of Titans`", parse_mode="Markdown")
             return
 
         guild_name_raw = parts[1].strip()
@@ -135,13 +132,13 @@ def handle_guild(message):
 
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
-            bot.reply_to(message, "📛 Гильдия не найдена.")
+            bot.reply_to(message, "Гильдия не найдено 📛")
             return
 
         soup = BeautifulSoup(resp.text, "html.parser")
         info = extract_guild_info_from_soup(soup, guild_name_raw)
         if not info:
-            bot.reply_to(message, "📛 Гильдия не найдена.")
+            bot.reply_to(message, "Гильдия не найдено 📛")
             return
 
         desc = info["description"].strip()
@@ -152,10 +149,10 @@ def handle_guild(message):
         reply_lines = [
             f"⚔️ Guild: *{info['title']}*",
             f"👥 Members: *{info['members_count']}*",
-            f"📅 Created on: *{info['created']}*",
+            f"📅 Create on: *{info['created']}*",
         ]
         if show_description:
-            reply_lines.append("📝 Description:")
+            reply_lines.append("📝 Описание:")
             reply_lines.append(description_block)
         reply_lines.append(f"🔗 Ссылка: {url}")
 
@@ -172,7 +169,7 @@ def handle_user(message):
         text = message.text or ""
         parts = text.split(" ", 1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.reply_to(message, "⚠️ Укажи ник игрока после команды, например:\n`/user Hero Of Titan`")
+            bot.reply_to(message, "⚠️ Укажи ник игрока после команды, например:\n`/user Hero Of Titan`", parse_mode="Markdown")
             return
 
         username_raw = parts[1].strip()
@@ -181,13 +178,13 @@ def handle_user(message):
 
         resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
-            bot.reply_to(message, "📛 Игрок не найден.")
+            bot.reply_to(message, "Игрок не найден 📛")
             return
 
         soup = BeautifulSoup(resp.text, "html.parser")
         char_table = soup.find("table")
         if not char_table:
-            bot.reply_to(message, "📛 Информация о игроке не найдена.")
+            bot.reply_to(message, "Информация о игроке не найдена 📛")
             return
 
         data = {}
