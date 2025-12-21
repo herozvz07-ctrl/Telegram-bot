@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import requests
@@ -5,13 +6,15 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
 
-# 🔑 ТВОЙ ТОКЕН
+# 🔑 Получаем токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
-bot = telebot.TeleBot(TOKEN)
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
+# Создаём объект бота
 bot = telebot.TeleBot(TOKEN, parse_mode="Markdown")
 
-# 🧠 Настройки
+# 🧠 Настройки заголовков
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
@@ -38,14 +41,14 @@ def start_message(message):
 @bot.message_handler(commands=["guild"])
 def handle_guild(message):
     try:
-        parts = message.text.split(" ", 1)
-        if len(parts) < 2:
+        cmd_parts = message.text.split(" ", 1)
+        if len(cmd_parts) < 2:
             bot.reply_to(message, "⚠️ Укажи название гильдии после команды, например:\n`/guild Imperia Of Titans`")
             return
 
-        guild_name_raw = parts[1].strip()
+        guild_name_raw = cmd_parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"
+        url = f"https://www.rucoyonline.com/guilds/{encoded}"
 
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if resp.status_code != 200:
@@ -72,13 +75,13 @@ def handle_guild(message):
         h1 = soup.find("h1")
         if h1:
             desc_tags = h1.find_all_next(["p", "div"], limit=10)
-            parts = []
+            desc_parts = []
             for t in desc_tags:
                 txt = t.get_text(" ", strip=True)
                 if txt and not re.search(r"(Founded on|Members)", txt, re.I):
-                    parts.append(txt)
-            if parts:
-                desc = " ".join(parts)
+                    desc_parts.append(txt)
+            if desc_parts:
+                desc = " ".join(desc_parts)
 
         info_text = (
             f"⚔️ Guild: *{name}*\n"
@@ -107,12 +110,12 @@ def handle_guild(message):
 @bot.message_handler(commands=["user"])
 def handle_user(message):
     try:
-        parts = message.text.split(" ", 1)
-        if len(parts) < 2:
+        cmd_parts = message.text.split(" ", 1)
+        if len(cmd_parts) < 2:
             bot.reply_to(message, "⚠️ Укажи ник игрока, например:\n`/user Hero Of Titan`")
             return
 
-        username = parts[1].strip()
+        username = cmd_parts[1].strip()
         encoded = quote(username, safe="")
         url = f"https://www.rucoyonline.com/characters/{encoded}"
 
@@ -151,7 +154,7 @@ def handle_user(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
-# 🚀 Запуск
+# 🚀 Запуск бота
 if __name__ == "__main__":
     print("Бот запущен...")
     while True:
