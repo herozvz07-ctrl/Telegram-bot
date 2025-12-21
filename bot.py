@@ -43,7 +43,7 @@ def handle_guild(message):
 
         guild_name_raw = cmd_parts[1].strip()
         encoded = quote(guild_name_raw, safe="")
-        url = f"https://www.rucoyonline.com/guild/{encoded}"  # исправленный URL
+        url = f"https://www.rucoyonline.com/guild/{encoded}"  # верный URL
 
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if resp.status_code != 200:
@@ -52,13 +52,14 @@ def handle_guild(message):
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Извлечение данных
-        page_text = soup.get_text("\n", strip=True)
+        # --- Извлечение данных ---
         name = " ".join(w.capitalize() for w in guild_name_raw.split())
 
-        m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
+        # Дата создания
+        m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", soup.get_text("\n", strip=True))
         created = m_created.group(1).strip() if m_created else "Не указано"
 
+        # Кол-во участников
         table = soup.find("table")
         members = "Не указано"
         if table:
@@ -66,17 +67,14 @@ def handle_guild(message):
             num = sum(1 for r in rows if r.find_all("td"))
             members = str(num)
 
+        # Описание гильдии (универсально)
         desc = "Нет описания"
-        h1 = soup.find("h1")
-        if h1:
-            desc_tags = h1.find_all_next(["p", "div"], limit=10)
-            desc_parts = []
-            for t in desc_tags:
-                txt = t.get_text(" ", strip=True)
-                if txt and not re.search(r"(Founded on|Members)", txt, re.I):
-                    desc_parts.append(txt)
-            if desc_parts:
-                desc = " ".join(desc_parts)
+        divs = soup.find_all("div")
+        for d in divs:
+            text = d.get_text(" ", strip=True)
+            if text and not re.search(r"(Founded on|Members)", text, re.I) and len(text) > 20:
+                desc = text
+                break
 
         info_text = (
             f"⚔️ Guild: *{name}*\n"
