@@ -237,6 +237,17 @@ def handle_user(message):
 
 if __name__ == "__main__":
     keep_alive()
-    bot.remove_webhook() # Очистка конфликтов
-    print("Бот запущен...")
+    
+    # Пытаемся очистить старые соединения
+    try:
+        bot.remove_webhook()
+        print("Старые соединения очищены.")
+        time.sleep(2)  # Короткая пауза, чтобы сервер Telegram успел обновить статус
+    except Exception as e:
+        print(f"Ошибка при удалении вебхука: {e}")
+
+    print("Бот запущен и готов к работе...")
+    
+    # Запускаем polling с автоматическим перезапуском
     bot.infinity_polling(timeout=60, long_polling_timeout=60)
+
