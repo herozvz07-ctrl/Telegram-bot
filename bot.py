@@ -177,7 +177,7 @@ def handle_guild(message):
     try:
         parts = message.text.split(" ", 1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.reply_to(message, "⚠️ Укажите название гильдии\n Например /guil Imperia Of Titans")
+            bot.reply_to(message, "⚠️ Укажите название гильдии\n\n Например: `/guild Imperia Of Titans`")
             return
         guild_name_raw = parts[1].strip()
         url = f"https://www.rucoyonline.com/guild/{quote(guild_name_raw)}"
@@ -204,7 +204,7 @@ def handle_user(message):
     try:
         parts = message.text.split(" ", 1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.reply_to(message, "⚠️ Укажите ник игрока\n например /user Qotok")
+            bot.reply_to(message, "⚠️ Укажите ник игрока\n\n например: `/user Qotok`")
             return
 
         username_raw = parts[1].strip()
