@@ -11,172 +11,245 @@ from threading import Thread
 
 # 🔑 КОНФИГУРАЦИЯ
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_USERNAME = "herozvz" 
+ADMIN_USERNAME = "herozvz"  # Твой ник без @
 SCAM_FILE = "scammers.json"
 
-print("--- [ЭТАП 1] ИНИЦИАЛИЗАЦИЯ ---")
 if not TOKEN:
-    print("❌ ОШИБКА: Переменная BOT_TOKEN не найдена!")
-else:
-    print(f"✅ Токен получен (начало: {TOKEN[:5]}...)")
+    raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# --- РАБОТА С ФАЙЛОМ СКAMЕРОВ ---
+# --- ФУНКЦИИ ДЛЯ РАБОТЫ СО СКАМ-ЛИСТОМ ---
 def load_scammers():
     try:
         if os.path.exists(SCAM_FILE):
             with open(SCAM_FILE, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-                return json.loads(content) if content else {}
+                if content:
+                    return json.loads(content)
     except Exception as e:
-        print(f"Ошибка загрузки скам-листа: {e}")
+        print(f"Error loading scammers: {e}")
     return {}
 
 def save_scammers(data):
-    try:
-        with open(SCAM_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"Ошибка сохранения скам-листа: {e}")
+    with open(SCAM_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-# --- WEB SERVER ДЛЯ RENDER ---
+# --- БЛОК ДЛЯ RENDER (WEB SERVER) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is Alive!"
+    return "Bot is alive!"
 
 def run_web_server():
-    # Render автоматически подставляет порт в переменную PORT
     port = int(os.environ.get("PORT", 8080))
-    print(f"--- [ЭТАП 2] ЗАПУСК FLASK НА ПОРТУ {port} ---")
     app.run(host='0.0.0.0', port=port)
 
-# --- ПАРСИНГ ОПИСАНИЯ ГИЛЬДИИ ---
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
-MENU_WORDS = {"le navigation","rucoy online","welcome","news","highscores","characters","guilds","sign in"}
+def keep_alive():
+    t = Thread(target=run_web_server)
+    t.daemon = True
+    t.start()
+
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПАРСИНГА (ИЗ ТВОЕГО КОДА) ---
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+}
+
+MENU_WORDS = {
+    "le navigation","rucoy online","welcome","news","highscores",
+    "characters","guilds","sign in","sign in with google","sign in with apple"
+}
+
+def remove_adjacent_duplicates(lines):
+    if not lines: return lines
+    out = [lines[0]]
+    for ln in lines[1:]:
+        if ln != out[-1]: out.append(ln)
+    return out
+
+def remove_repeated_block(lines):
+    n = len(lines)
+    if n < 2: return lines
+    for k in range(1, n//2 + 1):
+        if n >= 2*k and lines[0:k] == lines[k:2*k]:
+            return lines[0:k] + lines[2*k:]
+    return lines
 
 def extract_description(soup, guild_name_raw):
-    try:
-        page_text = soup.get_text("\n", strip=True)
-        idx = page_text.lower().find(guild_name_raw.lower())
-        if idx != -1:
-            start = idx + len(guild_name_raw)
-            m = re.search(r"(Founded on|Members)\b", page_text[start:], re.I)
-            chunk = page_text[start:start + m.start() if m else len(page_text)].strip()
-            lines = [ln.strip() for ln in re.split(r"\n+", chunk) if ln.strip()]
-            filtered = [ln for ln in lines if not any(w in ln.lower() for w in MENU_WORDS)]
-            return "\n".join(filtered[:5]).strip() or "Нет описания"
-    except: pass
-    return "Нет описания"
+    page_text = soup.get_text("\n", strip=True)
+    idx = page_text.lower().find(guild_name_raw.lower())
+    chunk = ""
+    if idx != -1:
+        start = idx + len(guild_name_raw)
+        m = re.search(r"(Founded on|Members)\b", page_text[start:], re.I)
+        end = start + m.start() if m else len(page_text)
+        chunk = page_text[start:end].strip()
+    else:
+        h1 = soup.find("h1")
+        if h1:
+            pieces = []
+            for elem in h1.next_elements:
+                if isinstance(elem, str): t = elem.strip()
+                else: t = elem.get_text(" ", strip=True)
+                if not t: continue
+                if re.search(r"(Founded on|Members)\b", t, re.I): break
+                pieces.append(t)
+            chunk = " ".join(pieces).strip()
+    if not chunk: return "Нет описания"
+    lines = [ln.strip() for ln in re.split(r"\n+", chunk) if ln.strip()]
+    filtered = [ln for ln in lines if not any(m in ln.lower() for m in MENU_WORDS) and ln.lower() != guild_name_raw.lower()]
+    filtered = remove_adjacent_duplicates(filtered)
+    filtered = remove_repeated_block(filtered)
+    desc = "\n".join(filtered).strip()
+    return desc if desc else "Нет описания"
 
-# ------------------------- КОМАНДЫ БОТА -------------------------
+def extract_guild_info_from_soup(soup, guild_name_raw):
+    page_text = soup.get_text("\n", strip=True)
+    pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
+    description = extract_description(soup, guild_name_raw)
+    created = "Не указано"
+    m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
+    if m_created: created = m_created.group(1).strip()
+    members_count = "Не указано"
+    table = soup.find("table")
+    if table:
+        rows = table.find_all("tr")
+        num = sum(1 for r in rows if r.find_all("td"))
+        members_count = str(num) if num > 0 else "Не указано"
+    if created == "Не указано" and members_count == "Не указано": return None
+    return {"title": pretty_title, "description": description, "created": created, "members_count": members_count}
+
+# ------------------------- КОМАНДЫ -------------------------
 
 @bot.message_handler(commands=['start'])
 def send_start(message):
-    bot.reply_to(message, "⚔️ Бот Rucoy Online готов! \nКоманды: /user [ник], /guild [название], /skam")
+    bot.reply_to(message, "Бот готов! Команды: /user [ник], /guild [гильдия], /skam")
 
 @bot.message_handler(commands=['skamer'])
 def add_scammer(message):
     if message.from_user.username != ADMIN_USERNAME:
-        bot.reply_to(message, "⛔ У вас нет прав админа.")
+        bot.reply_to(message, "⛔ Нет прав.")
         return
     try:
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
             bot.reply_to(message, "⚠️ Формат: `/skamer Nick Link`", parse_mode="Markdown")
             return
+        name, link = parts[1], parts[2]
         data = load_scammers()
-        data[parts[1]] = parts[2]
+        data[name] = link
         save_scammers(data)
-        bot.reply_to(message, f"✅ Игрок *{parts[1]}* добавлен в список скамеров.", parse_mode="Markdown")
+        bot.reply_to(message, f"✅ Игрок *{name}* добавлен.", parse_mode="Markdown")
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
+@bot.message_handler(commands=['unskam'])
+def remove_scammer(message):
+    if message.from_user.username != ADMIN_USERNAME: return
+    try:
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2: return
+        name = parts[1].strip()
+        data = load_scammers()
+        if name in data:
+            del data[name]
+            save_scammers(data)
+            bot.reply_to(message, f"🗑 *{name}* удален.")
+        else:
+            bot.reply_to(message, "❌ Не найден.")
+    except: pass
+
 @bot.message_handler(commands=['skam'])
 def list_scammers(message):
-    data = load_scammers()
-    if not data:
+    scammers = load_scammers()
+    if not scammers:
         bot.reply_to(message, "🛡️ Список скамеров пуст.")
         return
-    text = "🚫 *СПИСОК ИЗВЕСТНЫХ СКАМЕРОВ* 🚫\n\n"
-    for i, (name, link) in enumerate(data.items(), 1):
-        text += f"{i}. 👤 *{name}*\n🔗 {link}\n\n"
+    text = "🚫 *СПИСОК СКАМЕРОВ* 🚫\n\n"
+    for i, (name, link) in enumerate(scammers.items(), 1):
+        text += f"{i}. 👤 *{name}*\n   🔗 {link}\n\n"
     bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
-
-@bot.message_handler(commands=['user'])
-def handle_user(message):
-    try:
-        parts = message.text.split(" ", 1)
-        if len(parts) < 2:
-            bot.reply_to(message, "⚠️ Введи ник игрока: `/user Ник`", parse_mode="Markdown")
-            return
-        
-        name = parts[1].strip()
-        url = f"https://www.rucoyonline.com/characters/{quote(name)}"
-        
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        if resp.status_code != 200:
-            bot.reply_to(message, "Игрок не найден 📛")
-            return
-            
-        soup = BeautifulSoup(resp.text, "html.parser")
-        table = soup.find("table")
-        if not table:
-            bot.reply_to(message, "Информация о персонаже скрыта или не найдена 📛")
-            return
-            
-        d = {r.find_all("td")[0].get_text(strip=True): r.find_all("td")[1].get_text(strip=True) for r in table.find_all("tr") if len(r.find_all("td")) == 2}
-        
-        reply = (f"👤 *Nik:* {d.get('Name', name)}\n"
-                 f"📊 *LvL:* {d.get('Level', '???')}\n"
-                 f"⚔️ *Гильдия:* {d.get('Guild', 'Нет')}\n"
-                 f"🟢 *Online:* {d.get('Last online', '???')}\n"
-                 f"📅 *Создан:* {d.get('Born', '???')}\n"
-                 f"🔗 [Открыть профиль]({url})")
-        bot.reply_to(message, reply, parse_mode="Markdown", disable_web_page_preview=True)
-    except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка в /user: {e}")
 
 @bot.message_handler(commands=['guild'])
 def handle_guild(message):
     try:
         parts = message.text.split(" ", 1)
-        if len(parts) < 2:
-            bot.reply_to(message, "⚠️ Введи название гильдии: `/guild Название`", parse_mode="Markdown")
+        if len(parts) < 2 or not parts[1].strip():
+            bot.reply_to(message, "⚠️ Укажите название гильдии\n Например /guil Imperia Of Titans")
             return
-            
-        g_name = parts[1].strip()
-        url = f"https://www.rucoyonline.com/guild/{quote(g_name)}"
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        
+        guild_name_raw = parts[1].strip()
+        url = f"https://www.rucoyonline.com/guild/{quote(guild_name_raw)}"
+        resp = requests.get(url, headers=HEADERS, timeout=12)
         if resp.status_code != 200:
             bot.reply_to(message, "Гильдия не найдена 📛")
             return
-            
         soup = BeautifulSoup(resp.text, "html.parser")
-        desc = extract_description(soup, g_name)
-        
-        bot.reply_to(message, f"⚔️ *Guild:* {g_name}\n\n📝 *Описание:*\n{desc}\n\n🔗 [Страница гильдии]({url})", 
-                     parse_mode="Markdown", disable_web_page_preview=True)
+        info = extract_guild_info_from_soup(soup, guild_name_raw)
+        if not info:
+            bot.reply_to(message, "Гильдия не найдена 📛")
+            return
+        desc = info["description"].replace("```", "`\u200b``")
+        reply = [f"⚔️ Guild: *{info['title']}*", f"👥 Members: *{info['members_count']}*", f"📅 Create on: *{info['created']}*"]
+        if desc.lower() != "нет описания":
+            reply.extend(["📝 Описание:", f"```\n{desc}\n```"])
+        reply.append(f"🔗 Ссылка: {url}")
+        bot.reply_to(message, "\n".join(reply), parse_mode="Markdown", disable_web_page_preview=True)
     except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка в /guild: {e}")
+        bot.reply_to(message, f"❌ Ошибка: {e}")
 
-# ------------------------- ЗАПУСК -------------------------
-if __name__ == "__main__":
-    # 1. Запуск Flask в потоке
-    server_thread = Thread(target=run_web_server)
-    server_thread.daemon = True
-    server_thread.start()
-    
-    # 2. Очистка очереди и запуск поллинга
-    print("--- [ЭТАП 3] ПОДКЛЮЧЕНИЕ К TELEGRAM ---")
+@bot.message_handler(commands=['user'])
+def handle_user(message):
     try:
-        bot.remove_webhook(drop_pending_updates=True)
-        time.sleep(1)
-        print("✅ БОТ УСПЕШНО ЗАПУЩЕН!")
-        bot.infinity_polling(timeout=60, long_polling_timeout=60)
+        parts = message.text.split(" ", 1)
+        if len(parts) < 2 or not parts[1].strip():
+            bot.reply_to(message, "⚠️ Укажите ник игрока\n например /user Qotok")
+            return
+
+        username_raw = parts[1].strip()
+        url = f"https://www.rucoyonline.com/characters/{quote(username_raw)}"
+
+        resp = requests.get(url, headers=HEADERS, timeout=12)
+        if resp.status_code != 200:
+            bot.reply_to(message, "Игрок не найден 📛")
+            return
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        char_table = soup.find("table")
+        if not char_table:
+            bot.reply_to(message, "Информация не найдена 📛")
+            return
+
+        data = {
+            r.find_all("td")[0].get_text(strip=True): r.find_all("td")[1].get_text(strip=True)
+            for r in char_table.find_all("tr")
+            if len(r.find_all("td")) == 2
+        }
+
+        reply = (
+            f"👤 Nik: {data.get('Name', username_raw)}\n"
+            f"📊 LvL: {data.get('Level', '???')}\n"
+            f"⚔️ Гильдия: {data.get('Guild', 'Нет')}\n"
+            f"🟢 Online: {data.get('Last online', '???')}\n"
+            f"📅 Создан: {data.get('Born', '???')}\n"
+            f"🔗 Ссылка: {url}"
+        )
+
+        bot.reply_to(message, reply, disable_web_page_preview=True)
+
     except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
-    
+        bot.reply_to(message, f"❌ Ошибка: {e}")
+# ------------------------- MAIN -------------------------
+if __name__ == "__main__":
+    keep_alive()
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+    except: pass
+    print("Бот запущен...")
+    while True:
+        try:
+            bot.infinity_polling(timeout=60, long_polling_timeout=60)
+        except Exception as ex:
+            time.sleep(3)
