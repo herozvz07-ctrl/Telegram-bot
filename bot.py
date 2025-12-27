@@ -9,10 +9,10 @@ import telebot
 from flask import Flask        
 from threading import Thread
 
-# 🔑 Конфигурация
+# 🔑 Токен и настройки
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_USERNAME = "herozvz" "hero_hito_zvz" # Ваш ник без @
-SCAM_FILE = "scammers.json" # Файл для хранения данных
+ADMIN_USERNAME = "herozvz"  # Твой ник без @
+SCAM_FILE = "scammers.json"
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
@@ -25,11 +25,10 @@ def load_scammers():
         if os.path.exists(SCAM_FILE):
             with open(SCAM_FILE, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-                if not content:
-                    return {}
-                return json.loads(content)
+                if content:
+                    return json.loads(content)
     except Exception as e:
-        print(f"Error loading scammers: {e}")
+        print(f"Ошибка чтения скам-файла: {e}")
     return {}
 
 def save_scammers(data):
@@ -52,12 +51,16 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ПАРСИНГА (БЕЗ ИЗМЕНЕНИЙ) ---
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПАРСИНГА ---
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 }
-MENU_WORDS = {"le navigation","rucoy online","welcome","news","highscores","characters","guilds","sign in","sign in with google","sign in with apple"}
+
+MENU_WORDS = {
+    "le navigation","rucoy online","welcome","news","highscores",
+    "characters","guilds","sign in","sign in with google","sign in with apple"
+}
 
 def remove_adjacent_duplicates(lines):
     if not lines: return lines
@@ -103,23 +106,22 @@ def extract_description(soup, guild_name_raw):
     desc = "\n".join(filtered).strip()
     return desc if desc else "Нет описания"
 
-# ------------------------- НОВЫЕ КОМАНДЫ (SCAM SYSTEM) -------------------------
+# ------------------------- КОМАНДЫ SCAM SYSTEM -------------------------
 
 @bot.message_handler(commands=['skamer'])
 def add_scammer(message):
     if message.from_user.username != ADMIN_USERNAME:
-        bot.reply_to(message, "⛔ У вас нет прав для выполнения этой команды.")
+        bot.reply_to(message, "⛔ У вас нет прав.")
         return
     try:
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
-            bot.reply_to(message, "⚠️ Формат: `/skamer Nickname Link`", parse_mode="Markdown")
+            bot.reply_to(message, "⚠️ Формат: `/skamer Nick Link`", parse_mode="Markdown")
             return
-        name = parts[1]
-        link = parts[2]
-        scammers = load_scammers()
-        scammers[name] = link
-        save_scammers(scammers)
+        name, link = parts[1], parts[2]
+        data = load_scammers()
+        data[name] = link
+        save_scammers(data)
         bot.reply_to(message, f"✅ Игрок *{name}* добавлен в список скамеров.", parse_mode="Markdown")
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {str(e)}")
@@ -131,42 +133,36 @@ def remove_scammer(message):
     try:
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
-            bot.reply_to(message, "⚠️ Формат: `/unskam Nickname`", parse_mode="Markdown")
+            bot.reply_to(message, "⚠️ Формат: `/unskam Nick`", parse_mode="Markdown")
             return
         name = parts[1].strip()
-        scammers = load_scammers()
-        if name in scammers:
-            del scammers[name]
-            save_scammers(scammers)
+        data = load_scammers()
+        if name in data:
+            del data[name]
+            save_scammers(data)
             bot.reply_to(message, f"🗑 Игрок *{name}* удален из списка.", parse_mode="Markdown")
         else:
-            bot.reply_to(message, "❌ Игрок не найден в списке.")
+            bot.reply_to(message, "❌ Не найден в списке.")
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {str(e)}")
 
 @bot.message_handler(commands=['skam'])
 def list_scammers(message):
-    try:
-        scammers = load_scammers()
-        if not scammers:
-            bot.reply_to(message, "🛡️ Список скамеров пуст. Мир Rucoy чист!")
-            return
+    scammers = load_scammers()
+    if not scammers:
+        bot.reply_to(message, "🛡️ Список скамеров пуст. Мир Rucoy чист!")
+        return
+    text = "🚫 *СПИСОК ИЗВЕСТНЫХ СКАМЕРОВ* 🚫\n\n"
+    for i, (name, link) in enumerate(scammers.items(), 1):
+        text += f"{i}. 👤 *{name}*\n   🔗 {link}\n\n"
+    text += "⚠️ _Будьте осторожны при обмене!_"
+    bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
 
-        text = "🚫 *СПИСОК ИЗВЕСТНЫХ СКАМЕРОВ* 🚫\n\n"
-        for i, (name, link) in enumerate(scammers.items(), 1):
-            # Используем жирный шрифт и простую ссылку, чтобы не ломать Markdown
-            text += f"{i}. 👤 *{name}*\n   🔗 {link}\n\n"
-        
-        text += "⚠️ _Будьте осторожны при обмене!_"
-        bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
-    except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка в /skam: {str(e)}")
-
-# ------------------------- СТАРЫЕ КОМАНДЫ (БЕЗ ИЗМЕНЕНИЙ) -------------------------
+# ------------------------- СТАРЫЕ РАБОЧИЕ КОМАНДЫ -------------------------
 
 @bot.message_handler(commands=['start'])
 def send_start(message):
-    bot.reply_to(message, "Бот запущен! Команды:\n/user [ник]\n/guild [название]\n/skam - список скамеров")
+    bot.reply_to(message, "Бот запущен! Команды: /user [ник], /guild [название], /skam")
 
 @bot.message_handler(commands=['guild'])
 def handle_guild(message):
@@ -188,7 +184,6 @@ def handle_guild(message):
         
         soup = BeautifulSoup(resp.text, "html.parser")
         page_text = soup.get_text("\n", strip=True)
-        
         pretty_title = " ".join(w.capitalize() for w in guild_name_raw.split())
         description = extract_description(soup, guild_name_raw)
         
@@ -196,18 +191,16 @@ def handle_guild(message):
         m_created = re.search(r"Founded on\s*([A-Za-z0-9 ,]+)", page_text)
         if m_created: created = m_created.group(1).strip()
         
-        members_count = "Не указано"
         table = soup.find("table")
+        members_count = "Не указано"
         if table:
             rows = table.find_all("tr")
             num = sum(1 for r in rows if r.find_all("td"))
             members_count = str(num) if num > 0 else "Не указано"
 
         desc_clean = description.replace("```", "`\u200b``")
-        show_desc = bool(desc_clean and desc_clean.lower() != "нет описания")
-        
         reply = [f"⚔️ Guild: *{pretty_title}*", f"👥 Members: *{members_count}*", f"📅 Created on: *{created}*"]
-        if show_desc:
+        if desc_clean.lower() != "нет описания":
             reply.extend(["📝 Описание:", f"```\n{desc_clean}\n```"])
         reply.append(f"🔗 Ссылка: {url}")
         
@@ -226,7 +219,6 @@ def handle_user(message):
 
         username_raw = parts[1].strip()
         encoded_name = quote(username_raw, safe="")
-        # ИСПРАВЛЕНО: Убрана лишняя разметка из URL
         base_url = "[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/)"
         full_url = (base_url + encoded_name).strip()
 
@@ -258,7 +250,6 @@ def handle_user(message):
             f"🔗 Ссылка: {full_url}"
         )
         bot.reply_to(message, reply, disable_web_page_preview=True)
-
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка в /user: {str(e)}")
 
@@ -266,19 +257,17 @@ def handle_user(message):
 if __name__ == "__main__":
     keep_alive()
     
-    # Очистка вебхука перед запуском, чтобы избежать 409 Conflict
+    # Решение ошибки 409: Очистка вебхука перед стартом
     try:
         bot.remove_webhook()
         time.sleep(1)
     except:
         pass
-        
-    print("Бот запущен и веб-сервер активен...")
-    
+
+    print("Бот запущен...")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as ex:
             print(f"Polling error: {ex}")
             time.sleep(5)
-    
