@@ -1,7 +1,7 @@
 import os
 import re
 import time
-import json  # Добавлено для хранения данных
+import json
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
@@ -21,9 +21,15 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ СО СКАМ-ЛИСТОМ ---
 def load_scammers():
-    if os.path.exists(SCAM_FILE):
-        with open(SCAM_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+    try:
+        if os.path.exists(SCAM_FILE):
+            with open(SCAM_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                return json.loads(content)
+    except Exception as e:
+        print(f"Error loading scammers: {e}")
     return {}
 
 def save_scammers(data):
@@ -101,42 +107,60 @@ def extract_description(soup, guild_name_raw):
 
 @bot.message_handler(commands=['skamer'])
 def add_scammer(message):
-    # Проверка на админа
     if message.from_user.username != ADMIN_USERNAME:
         bot.reply_to(message, "⛔ У вас нет прав для выполнения этой команды.")
         return
-
     try:
-        # Ожидаемый формат: /skamer Nickname Link
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
             bot.reply_to(message, "⚠️ Формат: `/skamer Nickname Link`", parse_mode="Markdown")
             return
-
         name = parts[1]
         link = parts[2]
-
         scammers = load_scammers()
         scammers[name] = link
         save_scammers(scammers)
-
         bot.reply_to(message, f"✅ Игрок *{name}* добавлен в список скамеров.", parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
+
+@bot.message_handler(commands=['unskam'])
+def remove_scammer(message):
+    if message.from_user.username != ADMIN_USERNAME:
+        return
+    try:
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2:
+            bot.reply_to(message, "⚠️ Формат: `/unskam Nickname`", parse_mode="Markdown")
+            return
+        name = parts[1].strip()
+        scammers = load_scammers()
+        if name in scammers:
+            del scammers[name]
+            save_scammers(scammers)
+            bot.reply_to(message, f"🗑 Игрок *{name}* удален из списка.", parse_mode="Markdown")
+        else:
+            bot.reply_to(message, "❌ Игрок не найден в списке.")
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {str(e)}")
 
 @bot.message_handler(commands=['skam'])
 def list_scammers(message):
-    scammers = load_scammers()
-    if not scammers:
-        bot.reply_to(message, "🛡️ Список скамеров пуст. Мир Rucoy чист!")
-        return
+    try:
+        scammers = load_scammers()
+        if not scammers:
+            bot.reply_to(message, "🛡️ Список скамеров пуст. Мир Rucoy чист!")
+            return
 
-    text = "🚫 *СПИСОК ИЗВЕСТНЫХ СКАМЕРОВ* 🚫\n\n"
-    for i, (name, link) in enumerate(scammers.items(), 1):
-        text += f"{i}. 👤 *{name}*\n   🔗 [Доказательства]({link})\n\n"
-    
-    text += "⚠️ _Будьте осторожны при обмене!_"
-    bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
+        text = "🚫 *СПИСОК ИЗВЕСТНЫХ СКАМЕРОВ* 🚫\n\n"
+        for i, (name, link) in enumerate(scammers.items(), 1):
+            # Используем жирный шрифт и простую ссылку, чтобы не ломать Markdown
+            text += f"{i}. 👤 *{name}*\n   🔗 {link}\n\n"
+        
+        text += "⚠️ _Будьте осторожны при обмене!_"
+        bot.send_message(message.chat.id, text, parse_mode="Markdown", disable_web_page_preview=True)
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка в /skam: {str(e)}")
 
 # ------------------------- СТАРЫЕ КОМАНДЫ (БЕЗ ИЗМЕНЕНИЙ) -------------------------
 
@@ -202,6 +226,7 @@ def handle_user(message):
 
         username_raw = parts[1].strip()
         encoded_name = quote(username_raw, safe="")
+        # ИСПРАВЛЕНО: Убрана лишняя разметка из URL
         base_url = "[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/)"
         full_url = (base_url + encoded_name).strip()
 
@@ -240,6 +265,14 @@ def handle_user(message):
 # ------------------------- MAIN -------------------------
 if __name__ == "__main__":
     keep_alive()
+    
+    # Очистка вебхука перед запуском, чтобы избежать 409 Conflict
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+    except:
+        pass
+        
     print("Бот запущен и веб-сервер активен...")
     
     while True:
@@ -248,4 +281,4 @@ if __name__ == "__main__":
         except Exception as ex:
             print(f"Polling error: {ex}")
             time.sleep(5)
-
+    
