@@ -21,9 +21,9 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 # ---------------- Баннеры ----------------
 BANNERS = {
-    "start": "https://raw.githubusercontent.com/USERNAME/REPO/main/start.png",
+    "start": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "guild": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "user": "https://raw.githubusercontent.com/USERNAME/REPO/main/user.png",
+    "user": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "skam": "https://raw.githubusercontent.com/USERNAME/REPO/main/skam.png",
     "default": "https://raw.githubusercontent.com/USERNAME/REPO/main/default.png"
 }
