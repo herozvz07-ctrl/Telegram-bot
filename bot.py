@@ -227,7 +227,7 @@ def list_scam(msg):
     txt="🚫 *SCAM LIST*\n\n"
     for i,(k,v) in enumerate(data.items(),1):
         txt+=f"{i}. *{k}*\n{v}\n\n"
-    bot.send_message(msg.chat.id,txt,parse_mode="Markdown",disable_web_page_preview=True)
+    bot.send_message(msg.chat.id, txt, disable_web_page_preview=True)
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
