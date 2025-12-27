@@ -179,6 +179,31 @@ def user(msg):
 
     bot.reply_to(msg, reply, disable_web_page_preview=True)
 
+@bot.message_handler(commands=['unskam'])
+def remove_scam(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        bot.reply_to(msg, "⛔ Нет прав.")
+        return
+
+    parts = msg.text.split(" ", 1)
+    if len(parts) < 2:
+        bot.reply_to(
+            msg,
+            "🔴 `УКАЖИ НИК`\n\nПример:\n`/unskam pidor`",
+            parse_mode="Markdown"
+        )
+        return
+
+    name = parts[1].strip()
+    data = load_scammers()
+
+    if name in data:
+        del data[name]
+        save_scammers(data)
+        bot.reply_to(msg, f"🗑 *{name}* удалён из скам-листа.", parse_mode="Markdown")
+    else:
+        bot.reply_to(msg, "❌ Этот игрок не найден в скам-листе.")
+        
 # -------- SCAM --------
 @bot.message_handler(commands=['skamer'])
 def add_scam(msg):
