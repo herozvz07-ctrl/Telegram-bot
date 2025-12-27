@@ -11,7 +11,7 @@ from threading import Thread
 
 # 🔑 Конфигурация
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_USERNAME = "herozvz"  # Ваш ник без @
+ADMIN_USERNAME = "herozvz" "hero_hito_zvz" # Ваш ник без @
 SCAM_FILE = "scammers.json" # Файл для хранения данных
 
 if not TOKEN:
