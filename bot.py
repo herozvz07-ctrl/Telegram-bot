@@ -236,56 +236,65 @@ def user(msg):
 
     bot.reply_to(msg, reply, disable_web_page_preview=True)
 
-# -------- UNSKAM (Новая функция с твоим текстом) --------
+# -------- SCAM (Исправленный блок для групп) --------
+@bot.message_handler(commands=['skamer'])
+def add_scam(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        return
+    try:
+        parts = msg.text.split(maxsplit=2)
+        if len(parts) < 3:
+            bot.reply_to(msg, "Используй: `/skamer Nick link`", parse_mode="Markdown")
+            return
+        data = load_scammers()
+        data[parts[1]] = parts[2]
+        save_scammers(data)
+        bot.reply_to(msg, "✅ Добавлено")
+    except Exception as e:
+        print(f"Error in skamer: {e}")
+
+@bot.message_handler(commands=['skam'])
+def list_scam(msg):
+    try:
+        data = load_scammers()
+        if not data:
+            bot.reply_to(msg, "🛡️ Список пуст")
+            return
+        
+        txt = "🚫 *SCAM LIST*\n\n"
+        for i, (k, v) in enumerate(data.items(), 1):
+            # Очищаем ник и ссылку от символов, которые ломают Markdown
+            clean_name = k.replace("_", "\\_").replace("*", "")
+            clean_link = v.replace("_", "\\_")
+            txt += f"{i}. *{clean_name}*\n{clean_link}\n\n"
+            
+        # Используем обычный send_message, так как в группах reply_to может глючить при длинных списках
+        bot.send_message(msg.chat.id, txt, parse_mode="Markdown", disable_web_page_preview=True)
+    except Exception as e:
+        print(f"Error in skam list: {e}")
+        # Если Markdown все равно ломается, отправляем чистым текстом
+        bot.send_message(msg.chat.id, "❌ Ошибка отображения списка. Попробуйте позже.")
+
 @bot.message_handler(commands=['unskam'])
 def remove_scam(msg):
     if msg.from_user.username != ADMIN_USERNAME:
         bot.reply_to(msg, "⛔ Нет прав.")
         return
-
-    parts = msg.text.split(" ", 1)
-    if len(parts) < 2:
-        bot.reply_to(
-            msg,
-            "🔴 `УКАЖИ НИК`\n\nПример:\n`/unskam ник`",
-            parse_mode="Markdown"
-        )
-        return
-
-    name = parts[1].strip()
-    data = load_scammers()
-
-    if name in data:
-        del data[name]
-        save_scammers(data)
-        bot.reply_to(msg, f"🗑 *{name}* удалён из скам-листа.", parse_mode="Markdown")
-    else:
-        bot.reply_to(msg, "❌ Этот игрок не найден в скам-листе.")
-        
-# -------- SCAM (Твои оригинальные команды) --------
-@bot.message_handler(commands=['skamer'])
-def add_scam(msg):
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
-    parts = msg.text.split(maxsplit=2)
-    if len(parts)<3:
-        bot.reply_to(msg,"`/skamer Nick link`",parse_mode="Markdown")
-        return
-    data = load_scammers()
-    data[parts[1]] = parts[2]
-    save_scammers(data)
-    bot.reply_to(msg,"✅ Добавлено")
-
-@bot.message_handler(commands=['skam'])
-def list_scam(msg):
-    data = load_scammers()
-    if not data:
-        bot.reply_to(msg,"🛡️ Список пуст")
-        return
-    txt="🚫 *SCAM LIST*\n\n"
-    for i,(k,v) in enumerate(data.items(),1):
-        txt+=f"{i}. *{k}*\n{v}\n\n"
-    bot.send_message(msg.chat.id, txt, disable_web_page_preview=True)
+    try:
+        parts = msg.text.split(" ", 1)
+        if len(parts) < 2:
+            bot.reply_to(msg, "🔴 `УКАЖИ НИК`", parse_mode="Markdown")
+            return
+        name = parts[1].strip()
+        data = load_scammers()
+        if name in data:
+            del data[name]
+            save_scammers(data)
+            bot.reply_to(msg, f"🗑 *{name}* удалён из скам-листа.", parse_mode="Markdown")
+        else:
+            bot.reply_to(msg, "❌ Этот игрок не найден.")
+    except Exception as e:
+        print(f"Error in unskam: {e}")
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
