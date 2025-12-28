@@ -22,7 +22,7 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 # ---------------- Баннеры ----------------
 BANNERS = {
-    "start": "https://imgbb.com/][img]https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg",
+    "start": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "guild": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "user": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "skam": "https://raw.githubusercontent.com/USERNAME/REPO/main/skam.png",
@@ -109,38 +109,7 @@ def extract_description(soup, name):
 
 # ---------------- COMMANDS ----------------
 
-@bot.message_handler(commands=['start'])
-def send_start(message):
-    kb = types.InlineKeyboardMarkup(row_width=2)
 
-    kb.add(
-        types.InlineKeyboardButton("📘 Rucoy Wiki", url="https://t.me/ttinperia"),
-    )
-
-    kb.add(
-        types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
-        types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
-    )
-
-    kb.add(
-        types.InlineKeyboardButton("🧮 Calculator", callback_data="calc"),
-    )
-
-    kb.add(
-        types.InlineKeyboardButton("💰 Купить Gold", callback_data="buy_gold"),
-        types.InlineKeyboardButton("📤 Продать Gold", url="https://t.me/Bancus_Rucoy/159")
-    )
-
-    kb.add(
-        types.InlineKeyboardButton("ℹ️ Информация", callback_data="info")
-    )
-
-    bot.send_message(
-        message.chat.id,
-        "⚔️ *Rucoy Tools Hub*\n\nВыберите нужный раздел:",
-        parse_mode="Markdown",
-        reply_markup=kb
-    )
 
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
@@ -154,12 +123,36 @@ def send_calculator(call):
 def buy_gold_menu(call):
     kb = types.InlineKeyboardMarkup()
 
-    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
+    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейSTART_BANNER = "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg"
+
+@bot.message_handler(commands=['start'])
+def send_start(message):
+    kb = types.InlineKeyboardMarkup(row_width=2)
+
+    kb.add(types.InlineKeyboardButton("📘 Rucoy Wiki", url="https://t.me/ttinperia"))
+    kb.add(
+        types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
+        types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
+    )
+    kb.add(types.InlineKeyboardButton("🧮 Calculator", callback_data="calc"))
+    kb.add(
+        types.InlineKeyboardButton("💰 Купить Gold", callback_data="buy_gold"),
+        types.InlineKeyboardButton("📤 Продать Gold", url="https://t.me/Bancus_Rucoy/159")
+    )
+    kb.add(types.InlineKeyboardButton("ℹ️ Информация", callback_data="info"))
+
+    bot.send_photo(
+        message.chat.id,
+        START_BANNER,
+        caption="⚔️ *Rucoy Hub*\n\nВыберите раздел:",
+        parse_mode="Markdown",
+        reply_markup=kb
+    )деры", callback_data="gold_rates"))
     kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
 
     bot.send_message(
         call.message.chat.id,
-        "💰 *Покупка Gold*\n\nВыберите:",
+        "💰 *Покупка Gold*\n\nСредний курс золота на данный момент:\n16₽~1кк:",
         parse_mode="Markdown",
         reply_markup=kb
     )        
