@@ -20,7 +20,7 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# ---------------- Банеры ----------------
+# Ссылка на банер для меню /start
 START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
 # ---------------- SCAM STORAGE ----------------
@@ -86,17 +86,17 @@ def extract_description(soup, name):
         end = start + m.start() if m else len(text)
         chunk = text[start:end]
     if not chunk:
-        return "РќРµС‚ РѕРїРёСЃР°РЅРёСЏ"
+        return "Нет описания"
 
     lines = [l.strip() for l in chunk.split("\n") if l.strip()]
     lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
     lines = remove_adjacent_duplicates(lines)
     lines = remove_repeated_block(lines)
-    return "\n".join(lines) if lines else "РќРµС‚ РѕРїРёСЃР°РЅРёСЏ"
+    return "\n".join(lines) if lines else "Нет описания"
 
 # ---------------- COMMANDS ----------------
 
-# НОВОЕ МЕНЮ START
+# Новое меню при команде /start
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -120,7 +120,7 @@ def send_start(message):
         reply_markup=kb
     )
 
-# Обработка кнопок нового меню
+# Обработчики кнопок меню
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
     try:
@@ -145,21 +145,21 @@ def gold_rates(call):
     bot.send_message(call.message.chat.id, "📊 *Курсы Gold*\n\nЛучшие трейдеры и цены скоро здесь.", parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda c: c.data == "info")
-def info(call):
+def info_callback(call):
     bot.send_message(
         call.message.chat.id,
         "ℹ️ *Информация*\n\n📌 Команды:\n`/guild` — информация о гильдии\n`/user` — информация об игроке\n`/skam` — список скамеров\n\n👨‍💻 Создатель: @herozvz",
         parse_mode="Markdown"
     )
 
-# ТВОЙ ОРИГИНАЛЬНЫЙ ТЕКСТ ДЛЯ GUILD
+# -------- GUILD (Твой оригинальный текст) --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
     parts = msg.text.split(" ",1)
     if len(parts) < 2:
         bot.reply_to(
             msg,
-            "рџ”ґ `РЈРљРђР–Р РќРђР—Р’РђРќРР• Р“РР›Р¬Р”РР•`\n\nРџСЂРёРјРµСЂ:\n`/guild Imperia Of Titans`",
+            "🔴 `УКАЖИ НАЗВАНИЕ ГИЛЬДИИ`\n\nПример:\n`/guild Imperia Of Titans`",
             parse_mode="Markdown"
         )
         return
@@ -169,14 +169,14 @@ def guild(msg):
 
     r = requests.get(url, headers=HEADERS)
     if r.status_code != 200:
-        bot.reply_to(msg, "Р“РёР»СЊРґРёСЏ РЅРµ РЅР°Р№РґРµРЅР° рџ“›")
+        bot.reply_to(msg, "Гильдия не найдена 📛")
         return
 
     soup = BeautifulSoup(r.text,"html.parser")
     text = soup.get_text("\n",strip=True)
 
     created = re.search(r"Founded on ([A-Za-z0-9 ,]+)", text)
-    created = created.group(1) if created else "РќРµ СѓРєР°Р·Р°РЅРѕ"
+    created = created.group(1) if created else "Не указано"
 
     members = soup.find_all("tr")
     members = sum(1 for r in members if r.find_all("td"))
@@ -184,23 +184,23 @@ def guild(msg):
     desc = extract_description(soup, name)
 
     reply = (
-        f"вљ”пёЏ *{name}*\n"
-        f"рџ‘Ґ Members: *{members}*\n"
-        f"рџ“… Created: *{created}*\n\n"
+        f"⚔️ *{name}*\n"
+        f"👥 Members: *{members}*\n"
+        f"📅 Created: *{created}*\n\n"
         f"```\n{desc}\n```\n"
-        f"рџ”— {url}"
+        f"🔗 {url}"
     )
 
     bot.reply_to(msg, reply, parse_mode="Markdown", disable_web_page_preview=True)
 
-# ТВОЙ ОРИГИНАЛЬНЫЙ ТЕКСТ ДЛЯ USER
+# -------- USER (Твой оригинальный текст) --------
 @bot.message_handler(commands=['user'])
 def user(msg):
     parts = msg.text.split(" ",1)
     if len(parts) < 2:
         bot.reply_to(
             msg,
-            "рџ”ґ `РЈРљРђР–Р РќРРљ РР“Р РћРљРђ`\n\nРџСЂРёРјРµСЂ:\n`/user Hero Of Titan`",
+            "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
             parse_mode="Markdown"
         )
         return
@@ -210,13 +210,13 @@ def user(msg):
 
     r = requests.get(url, headers=HEADERS)
     if r.status_code != 200:
-        bot.reply_to(msg, "РРіСЂРѕРє РЅРµ РЅР°Р№РґРµРЅ рџ“›")
+        bot.reply_to(msg, "Игрок не найден 📛")
         return
 
     soup = BeautifulSoup(r.text,"html.parser")
     table = soup.find("table")
     if not table:
-        bot.reply_to(msg, "РќРµС‚ РґР°РЅРЅС‹С… рџ“›")
+        bot.reply_to(msg, "Нет данных 📛")
         return
 
     data = {}
@@ -226,28 +226,28 @@ def user(msg):
             data[td[0].text.strip()] = td[1].text.strip()
 
     reply = (
-        f"рџ‘¤ {data.get('Name',name)}\n"
-        f"рџ“Љ Level: {data.get('Level','?')}\n"
-        f"вљ”пёЏ Guild: {data.get('Guild','None')}\n"
-        f"рџџў Last online: {data.get('Last online','?')}\n"
-        f"рџ“… Born: {data.get('Born','?')}\n"
-        f"рџ”— {url}"
+        f"👤 {data.get('Name',name)}\n"
+        f"📊 Level: {data.get('Level','?')}\n"
+        f"⚔️ Guild: {data.get('Guild','None')}\n"
+        f"🟢 Last online: {data.get('Last online','?')}\n"
+        f"📅 Born: {data.get('Born','?')}\n"
+        f"🔗 {url}"
     )
 
     bot.reply_to(msg, reply, disable_web_page_preview=True)
 
-# ТВОЙ ОРИГИНАЛЬНЫЙ UNSKAM
+# -------- UNSKAM (Новая функция с твоим текстом) --------
 @bot.message_handler(commands=['unskam'])
 def remove_scam(msg):
     if msg.from_user.username != ADMIN_USERNAME:
-        bot.reply_to(msg, "в›” РќРµС‚ РїСЂР°РІ.")
+        bot.reply_to(msg, "⛔ Нет прав.")
         return
 
     parts = msg.text.split(" ", 1)
     if len(parts) < 2:
         bot.reply_to(
             msg,
-            "рџ”ґ `РЈРљРђР–Р РќРРљ`\n\nРџСЂРёРјРµСЂ:\n`/unskam pidor`",
+            "🔴 `УКАЖИ НИК`\n\nПример:\n`/unskam ник`",
             parse_mode="Markdown"
         )
         return
@@ -258,11 +258,11 @@ def remove_scam(msg):
     if name in data:
         del data[name]
         save_scammers(data)
-        bot.reply_to(msg, f"рџ—‘ *{name}* СѓРґР°Р»С‘РЅ РёР· СЃРєР°Рј-Р»РёСЃС‚Р°.", parse_mode="Markdown")
+        bot.reply_to(msg, f"🗑 *{name}* удалён из скам-листа.", parse_mode="Markdown")
     else:
-        bot.reply_to(msg, "вќЊ Р­С‚РѕС‚ РёРіСЂРѕРє РЅРµ РЅР°Р№РґРµРЅ РІ СЃРєР°Рј-Р»РёСЃС‚Рµ.")
+        bot.reply_to(msg, "❌ Этот игрок не найден в скам-листе.")
         
-# -------- SCAM --------
+# -------- SCAM (Твои оригинальные команды) --------
 @bot.message_handler(commands=['skamer'])
 def add_scam(msg):
     if msg.from_user.username != ADMIN_USERNAME:
@@ -274,15 +274,15 @@ def add_scam(msg):
     data = load_scammers()
     data[parts[1]] = parts[2]
     save_scammers(data)
-    bot.reply_to(msg,"вњ… Р”РѕР±Р°РІР»РµРЅРѕ")
+    bot.reply_to(msg,"✅ Добавлено")
 
 @bot.message_handler(commands=['skam'])
 def list_scam(msg):
     data = load_scammers()
     if not data:
-        bot.reply_to(msg,"рџ›ЎпёЏ РЎРїРёСЃРѕРє РїСѓСЃС‚")
+        bot.reply_to(msg,"🛡️ Список пуст")
         return
-    txt="рџљ« *SCAM LIST*\n\n"
+    txt="🚫 *SCAM LIST*\n\n"
     for i,(k,v) in enumerate(data.items(),1):
         txt+=f"{i}. *{k}*\n{v}\n\n"
     bot.send_message(msg.chat.id, txt, disable_web_page_preview=True)
@@ -290,8 +290,11 @@ def list_scam(msg):
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     keep_alive()
-    bot.remove_webhook()
-    time.sleep(1)
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+    except:
+        pass
     print("Bot started")
     bot.infinity_polling()
-                  
+        
