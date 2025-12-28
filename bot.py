@@ -192,8 +192,8 @@ def send_calculator(call):
 def buy_gold_menu(call):
     kb = types.InlineKeyboardMarkup()
 
-    kb.add(types.InlineKeyboardButton("📊 Курсы и топ - продавцов")
-
+    START_BANNER = "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg"
+kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
 @bot.message_handler(commands=['start'])
 
 # -------- GUILD --------
