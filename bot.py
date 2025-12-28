@@ -23,7 +23,6 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 # ---------------- Баннеры ----------------
 BANNERS = {
     "start": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "skam": "https://i.postimg.cc/j2wr2w1t/IMG-20251228-111056-006.jpg",
     "default": "https://raw.githubusercontent.com/USERNAME/REPO/main/default.png"
 }
 
@@ -280,24 +279,34 @@ def remove_scam(msg):
     else:
         send_with_banner(msg.chat.id, "❌ Не найден в списке.", banner_type="skam")
 
-@bot.message_handler(commands=['skam'])
-def skam_handler(message):
-    try:
-        # 1. Сначала уведомляем пользователя, что процесс пошел
-        msg = bot.reply_to(message, "⏳ Обрабатываю команду skam...")
+def escape_md(text):
+    return re.sub(r'([_*[\]()~`>#+\-=|{}.!])', r'\\\1', text)
 
-        # 2. ТУТ ВАШ ТЕКУЩИЙ КОД (Парсинг, логика, расчеты)
-        # Например:
-        # result = your_parsing_function() 
-        
-        # 3. Отправка результата
-        bot.send_message(message.chat.id, "✅ Команда выполнена успешно!")
+@bot.message_handler(commands=['skam'])
+def list_scam(msg):
+    try:
+        data = load_scammers()
+        if not data:
+            send_with_banner(msg.chat.id, "🛡️ Список пуст", banner_type="skam")
+            return
+
+        txt = "🚫 *SCAM LIST*\n\n"
+        for i, (k, v) in enumerate(data.items(), 1):
+            k = escape_md(k)
+            v = escape_md(v)
+            txt += f"{i}. 👤 *{k}*\n🔗 {v}\n\n"
+
+        send_with_banner(
+            msg.chat.id,
+            txt,
+            banner_type="skam",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
 
     except Exception as e:
-        # Если что-то пошло не так, бот не зависнет!
-        print(f"Критическая ошибка в /skam: {e}")
-        bot.send_message(message.chat.id, f"❌ Произошла ошибка: {e}")
-        # Бот останется "живым" для других команд
+        bot.send_message(msg.chat.id, "❌ Ошибка чтения scam list")
+        print("SKAM ERROR:", e)
 
 
 # ---------------- MAIN ----------------
