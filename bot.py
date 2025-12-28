@@ -23,9 +23,7 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 # ---------------- Баннеры ----------------
 BANNERS = {
     "start": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "guild": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "user": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "skam": "https://raw.githubusercontent.com/USERNAME/REPO/main/skam.png",
+    "skam": "https://i.postimg.cc/j2wr2w1t/IMG-20251228-111056-006.jpg",
     "default": "https://raw.githubusercontent.com/USERNAME/REPO/main/default.png"
 }
 
@@ -114,7 +112,7 @@ START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(types.InlineKeyboardButton("📘 Rucoy Wiki", url="https://t.me/ttinperia"))
+    kb.add(types.InlineKeyboardButton("📘 Rucoy Wiki", url="https://t.me/rucoy_wiki"))
     kb.add(
         types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
         types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
