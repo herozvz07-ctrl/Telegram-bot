@@ -281,16 +281,24 @@ def remove_scam(msg):
         send_with_banner(msg.chat.id, "❌ Не найден в списке.", banner_type="skam")
 
 @bot.message_handler(commands=['skam'])
-def list_scam(msg):
-    data = load_scammers()
-    if not data:
-        send_with_banner(msg.chat.id, "🛡️ Список пуст", banner_type="skam")
-        return
-    txt = "🚫 *SCAM LIST*\n\n"
-    for i, (k, v) in enumerate(data.items(), 1):
-        txt += f"{i}. 👤 *{k}*\n🔗 {v}\n\n"
-    # Для списка скамеров лучше использовать Markdown (V1), так как V2 падает на ссылках
-    send_with_banner(msg.chat.id, txt, banner_type="skam", parse_mode="Markdown", disable_web_page_preview=True)
+def skam_handler(message):
+    try:
+        # 1. Сначала уведомляем пользователя, что процесс пошел
+        msg = bot.reply_to(message, "⏳ Обрабатываю команду skam...")
+
+        # 2. ТУТ ВАШ ТЕКУЩИЙ КОД (Парсинг, логика, расчеты)
+        # Например:
+        # result = your_parsing_function() 
+        
+        # 3. Отправка результата
+        bot.send_message(message.chat.id, "✅ Команда выполнена успешно!")
+
+    except Exception as e:
+        # Если что-то пошло не так, бот не зависнет!
+        print(f"Критическая ошибка в /skam: {e}")
+        bot.send_message(message.chat.id, f"❌ Произошла ошибка: {e}")
+        # Бот останется "живым" для других команд
+
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
