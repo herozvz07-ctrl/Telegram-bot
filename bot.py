@@ -135,10 +135,15 @@ def send_start(message):
 # ---------- Callbacks ----------
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
+    # ID канала (можно использовать юзернейм с @)
+    source_chat = "@rucoy_calculyator"
+    # ID сообщения (номер поста в канале)
+    message_id = 2
     try:
-        bot.send_document(call.message.chat.id, open("calculator.pdf", "rb"))
-    except:
-        bot.send_message(call.message.chat.id, "❌ Файл calculator.pdf не найден.")
+        # Пересылаем пост с PDF напрямую пользователю
+        bot.forward_message(call.message.chat.id, source_chat, message_id)
+    except Exception as e:
+        bot.send_message(call.message.chat.id, f"❌ Не удалось переслать файл: {e}")
 
 @bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
 def buy_gold_menu(call):
