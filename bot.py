@@ -99,32 +99,10 @@ def extract_description(soup, name):
         end = start + m.start() if m else len(text)
         chunk = text[start:end]
     if not chunk:
-        return "Нет описания"
 
-    lines = [l.strip() for l in chunk.split("\n") if l.strip()]
-    lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
-    lines = remove_adjacent_duplicates(lines)
-    lines = remove_repeated_block(lines)
-    return "\n".join(lines) if lines else "Нет описания"
+START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
-# ---------------- COMMANDS ----------------
-
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "calc")
-def send_calculator(call):
-    try:
-        bot.send_document(call.message.chat.id, open("calculator.pdf", "rb"))
-    except:
-        bot.send_message(call.message.chat.id, "❌ Файл калькулятора не найден.")
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
-def buy_gold_menu(call):
-    kb = types.InlineKeyboardMarkup()
-
-    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейSTART_BANNER = "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg"
-
+# ---------- /start ----------
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -147,17 +125,31 @@ def send_start(message):
         caption="⚔️ *Rucoy Hub*\n\nВыберите раздел:",
         parse_mode="Markdown",
         reply_markup=kb
-    )деры", callback_data="gold_rates"))
+    )
+
+# ---------- Calculator ----------
+@bot.callback_query_handler(func=lambda c: c.data == "calc")
+def send_calculator(call):
+    try:
+        bot.send_document(call.message.chat.id, open("calculator.pdf", "rb"))
+    except:
+        bot.send_message(call.message.chat.id, "❌ Файл calculator.pdf не найден.")
+
+# ---------- Buy Gold ----------
+@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
+def buy_gold_menu(call):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
     kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
 
     bot.send_message(
         call.message.chat.id,
-        "💰 *Покупка Gold*\n\nСредний курс золота на данный момент:\n16₽~1кк:",
+        "💰 *Покупка Gold*\n\nСредний курс:\n16₽ ≈ 1кк",
         parse_mode="Markdown",
         reply_markup=kb
-    )        
+    )
 
-    
+# ---------- Gold rates ----------
 @bot.callback_query_handler(func=lambda c: c.data == "gold_rates")
 def gold_rates(call):
     bot.send_message(
@@ -166,7 +158,7 @@ def gold_rates(call):
         parse_mode="Markdown"
     )
 
-
+# ---------- Info ----------
 @bot.callback_query_handler(func=lambda c: c.data == "info")
 def info(call):
     bot.send_message(
@@ -178,7 +170,32 @@ def info(call):
         "`/skam` — список скамеров\n\n"
         "👨‍💻 Создатель: @herozvz",
         parse_mode="Markdown"
-    )
+        )        return "Нет описания"
+
+    lines = [l.strip() for l in chunk.split("\n") if l.strip()]
+    lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
+    lines = remove_adjacent_duplicates(lines)
+    lines = remove_repeated_block(lines)
+    return "\n".join(lines) if lines else "Нет описания"
+
+# ---------------- COMMANDS ----------------
+
+@bot.callback_query_handler(func=lambda c: c.data == "calc")
+def send_calculator(call):
+    try:
+        bot.send_document(call.message.chat.id, open("calculator.pdf", "rb"))
+    except:
+        bot.send_message(call.message.chat.id, "❌ Файл калькулятора не найден.")
+
+
+@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
+def buy_gold_menu(call):
+    kb = types.InlineKeyboardMarkup()
+
+    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейSTART_BANNER = "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg"
+
+@bot.message_handler(commands=['start'])
+
 # -------- GUILD --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
