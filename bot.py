@@ -194,26 +194,57 @@ def guild(msg):
 def user(msg):
     parts = msg.text.split(" ", 1)
     if len(parts) < 2:
-        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`", banner_type="user", parse_mode="Markdown")
+        send_with_banner(
+            msg.chat.id,
+            "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
+            banner_type="user",
+            parse_mode="Markdown"
+        )
         return
+
     name = parts[1].strip()
-    url = f"[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/){quote(name)}"
-    r = requests.get(url, headers=HEADERS)
-    if r.status_code != 200:
-        send_with_banner(msg.chat.id, "Игрок не найден 📛", banner_type="user")
-        return
-    soup = BeautifulSoup(r.text, "html.parser")
-    table = soup.find("table")
-    if not table:
-        send_with_banner(msg.chat.id, "Нет данных 📛", banner_type="user")
-        return
-    data = {}
-    for tr in table.find_all("tr"):
-        td = tr.find_all("td")
-        if len(td) == 2:
-            data[td[0].text.strip()] = td[1].text.strip()
-    reply = f"👤 {data.get('Name',name)}\n📊 Level: {data.get('Level','?')}\n⚔️ Guild: {data.get('Guild','None')}\n🟢 Last online: {data.get('Last online','?')}\n📅 Born: {data.get('Born','?')}\n🔗 {url}"
-    send_with_banner(msg.chat.id, reply, banner_type="user", disable_web_page_preview=True)
+    url = f"https://www.rucoyonline.com/characters/{quote(name)}"
+
+    try:
+        r = requests.get(url, headers=HEADERS)
+        if r.status_code != 200:
+            send_with_banner(msg.chat.id, "Игрок не найден 📛", banner_type="user")
+            return
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        table = soup.find("table")
+        if not table:
+            send_with_banner(msg.chat.id, "Нет данных или персонаж скрыт 📛", banner_type="user")
+            return
+
+        data = {}
+        for tr in table.find_all("tr"):
+            td = tr.find_all("td")
+            if len(td) == 2:
+                # Убираем двоеточие из названия (например, "Level:" -> "Level")
+                key = td[0].text.strip().replace(":", "")
+                value = td[1].text.strip()
+                data[key] = value
+
+        reply = (
+            f"👤 *{data.get('Name', name)}*\n"
+            f"📊 Level: {data.get('Level', '?')}\n"
+            f"⚔️ Guild: {data.get('Guild', 'None')}\n"
+            f"🟢 Last online: {data.get('Last online', '?')}\n"
+            f"📅 Born: {data.get('Born', '?')}\n"
+            f"🔗 {url}"
+        )
+
+        send_with_banner(
+            msg.chat.id,
+            reply,
+            banner_type="user",
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+    except Exception as e:
+        bot.send_message(msg.chat.id, "❌ Ошибка при получении данных.")
+
 
 # -------- SCAM --------
 @bot.message_handler(commands=['skamer'])
