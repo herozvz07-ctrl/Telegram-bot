@@ -18,15 +18,15 @@ SCAM_FILE = "scammers.json"
 if not TOKEN:
     raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 # ---------------- Баннеры ----------------
 BANNERS = {
-    "start": "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg",
+    "start": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "guild": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
     "user": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "skam": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg",
-    "default": "https://allwebs.ru/images/2025/12/27/e8447e2372bd8244de34f836d970efb8.jpg"
+    "skam": "https://raw.githubusercontent.com/USERNAME/REPO/main/skam.png",
+    "default": "https://raw.githubusercontent.com/USERNAME/REPO/main/default.png"
 }
 
 def send_with_banner(chat_id, text, banner_type="default", **kwargs):
@@ -36,13 +36,14 @@ def send_with_banner(chat_id, text, banner_type="default", **kwargs):
     except:
         bot.send_message(chat_id, text, **kwargs)
 
-# ---------------- Хранилище SCAM ----------------
+# ---------------- SCAM STORAGE ----------------
 def load_scammers():
     try:
         if os.path.exists(SCAM_FILE):
             with open(SCAM_FILE, "r", encoding="utf-8") as f:
                 data = f.read().strip()
-                return json.loads(data) if data else {}
+                if data:
+                    return json.loads(data)
     except:
         pass
     return {}
@@ -51,7 +52,7 @@ def save_scammers(data):
     with open(SCAM_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# ---------------- Web Server (Keep Alive) ----------------
+# ---------------- RENDER KEEP ALIVE ----------------
 app = Flask('')
 
 @app.route('/')
@@ -64,8 +65,11 @@ def run_web_server():
 def keep_alive():
     Thread(target=run_web_server, daemon=True).start()
 
-# ---------------- Парсинг сайта Rucoy ----------------
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+# ---------------- PARSING ----------------
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
 MENU_WORDS = {
     "le navigation","rucoy online","welcome","news","highscores",
     "characters","guilds","sign in","sign in with google","sign in with apple"
@@ -94,7 +98,7 @@ def extract_description(soup, name):
         m = re.search(r"(Founded on|Members)", text[start:], re.I)
         end = start + m.start() if m else len(text)
         chunk = text[start:end]
-        
+    
     if not chunk:
         return "Нет описания"
 
@@ -104,8 +108,9 @@ def extract_description(soup, name):
     lines = remove_repeated_block(lines)
     return "\n".join(lines) if lines else "Нет описания"
 
-# ---------------- Основные команды ----------------
+START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
+# ---------- /start ----------
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -121,19 +126,19 @@ def send_start(message):
     )
     kb.add(types.InlineKeyboardButton("ℹ️ Информация", callback_data="info"))
 
-    send_with_banner(
-        message.chat.id, 
-        "⚔️ *Rucoy Hub*\n\nВыберите раздел:", 
-        banner_type="start", 
-        parse_mode="Markdown", 
+    bot.send_photo(
+        message.chat.id,
+        START_BANNER,
+        caption="⚔️ *Rucoy Hub*\n\nВыберите раздел:",
+        parse_mode="Markdown",
         reply_markup=kb
     )
 
+# ---------- Callbacks ----------
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
     try:
-        with open("calculator.pdf", "rb") as doc:
-            bot.send_document(call.message.chat.id, doc)
+        bot.send_document(call.message.chat.id, open("calculator.pdf", "rb"))
     except:
         bot.send_message(call.message.chat.id, "❌ Файл calculator.pdf не найден.")
 
@@ -142,7 +147,6 @@ def buy_gold_menu(call):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
     kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
-
     bot.send_message(
         call.message.chat.id,
         "💰 *Покупка Gold*\n\nСредний курс:\n16₽ ≈ 1кк",
@@ -158,95 +162,89 @@ def gold_rates(call):
 def info(call):
     bot.send_message(
         call.message.chat.id,
-        "ℹ️ *Информация*\n\n📌 Команды:\n`/guild` — инфо о гильдии\n`/user` — инфо об игроке\n`/skam` — список скамеров\n\n👨‍💻 Создатель: @herozvz",
+        "ℹ️ *Информация*\n\n📌 Команды:\n`/guild` — информация о гильдии\n`/user` — информация об игроке\n`/skam` — список скамеров\n\n👨‍💻 Создатель: @herozvz",
         parse_mode="Markdown"
     )
 
-# ---------------- ГИЛЬДИИ И ИГРОКИ ----------------
-
+# -------- GUILD --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
     parts = msg.text.split(" ", 1)
     if len(parts) < 2:
-        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НАЗВАНИЕ ГИЛЬДИИ`", banner_type="guild", parse_mode="Markdown")
+        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НАЗВАНИЕ ГИЛЬДИИ`\n\nПример:\n`/guild Imperia Of Titans`", banner_type="guild", parse_mode="Markdown")
         return
-
     name = parts[1].strip()
     url = f"https://www.rucoyonline.com/guild/{quote(name)}"
     r = requests.get(url, headers=HEADERS)
-    
     if r.status_code != 200:
         send_with_banner(msg.chat.id, "Гильдия не найдена 📛", banner_type="guild")
         return
-
     soup = BeautifulSoup(r.text, "html.parser")
-    text = soup.get_text("\n", strip=True)
-    created = re.search(r"Founded on ([A-Za-z0-9 ,]+)", text)
+    text_all = soup.get_text("\n", strip=True)
+    created = re.search(r"Founded on ([A-Za-z0-9 ,]+)", text_all)
     created = created.group(1) if created else "Не указано"
-    members = sum(1 for tr in soup.find_all("tr") if tr.find_all("td"))
-    
+    members = sum(1 for r in soup.find_all("tr") if r.find_all("td"))
     desc = extract_description(soup, name)
     desc_clean = desc.replace("```", "`\u200b``")
-    
-    reply = (f"⚔️ *{name}*\n👥 Members: *{members}*\n📅 Created: *{created}*\n\n"
-             f"```\n{desc_clean}\n```\n🔗 {url}")
-
+    reply = f"⚔️ *{name}*\n👥 Members: *{members}*\n📅 Created: *{created}*\n\n```\n{desc_clean}\n```\n🔗 {url}"
     send_with_banner(msg.chat.id, reply, banner_type="guild", parse_mode="Markdown", disable_web_page_preview=True)
 
+# -------- USER --------
 @bot.message_handler(commands=['user'])
 def user(msg):
     parts = msg.text.split(" ", 1)
     if len(parts) < 2:
-        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НИК ИГРОКА`", banner_type="user", parse_mode="Markdown")
+        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`", banner_type="user", parse_mode="Markdown")
         return
-
     name = parts[1].strip()
     url = f"[https://www.rucoyonline.com/characters/](https://www.rucoyonline.com/characters/){quote(name)}"
     r = requests.get(url, headers=HEADERS)
-    
     if r.status_code != 200:
         send_with_banner(msg.chat.id, "Игрок не найден 📛", banner_type="user")
         return
-
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table")
     if not table:
         send_with_banner(msg.chat.id, "Нет данных 📛", banner_type="user")
         return
-
-    data = {tr.find_all("td")[0].text.strip(): tr.find_all("td")[1].text.strip() for tr in table.find_all("tr") if len(tr.find_all("td")) == 2}
-
-    reply = (f"👤 {data.get('Name', name)}\n📊 Level: {data.get('Level', '?')}\n"
-             f"⚔️ Guild: {data.get('Guild', 'None')}\n🟢 Online: {data.get('Last online', '?')}\n"
-             f"📅 Born: {data.get('Born', '?')}\n🔗 {url}")
-
+    data = {}
+    for tr in table.find_all("tr"):
+        td = tr.find_all("td")
+        if len(td) == 2:
+            data[td[0].text.strip()] = td[1].text.strip()
+    reply = f"👤 {data.get('Name',name)}\n📊 Level: {data.get('Level','?')}\n⚔️ Guild: {data.get('Guild','None')}\n🟢 Last online: {data.get('Last online','?')}\n📅 Born: {data.get('Born','?')}\n🔗 {url}"
     send_with_banner(msg.chat.id, reply, banner_type="user", disable_web_page_preview=True)
 
-# ---------------- SCAM СИСТЕМА ----------------
-
+# -------- SCAM --------
 @bot.message_handler(commands=['skamer'])
 def add_scam(msg):
     if msg.from_user.username != ADMIN_USERNAME: return
     parts = msg.text.split(maxsplit=2)
     if len(parts) < 3:
-        bot.reply_to(msg, "Используй: `/skamer Nick link`")
+        send_with_banner(msg.chat.id, "`/skamer Nick link`", banner_type="skam", parse_mode="Markdown")
         return
     data = load_scammers()
     data[parts[1]] = parts[2]
     save_scammers(data)
-    bot.send_message(msg.chat.id, "✅ Добавлено")
+    send_with_banner(msg.chat.id, "✅ Добавлено", banner_type="skam")
 
 @bot.message_handler(commands=['unskam'])
 def remove_scam(msg):
-    if msg.from_user.username != ADMIN_USERNAME: return
-    name = msg.text.split(" ", 1)[-1].strip()
+    if msg.from_user.username != ADMIN_USERNAME:
+        send_with_banner(msg.chat.id, "⛔ Нет прав", banner_type="skam")
+        return
+    parts = msg.text.split(" ", 1)
+    if len(parts) < 2:
+        send_with_banner(msg.chat.id, "🔴 `УКАЖИ НИК`", banner_type="skam", parse_mode="Markdown")
+        return
+    name = parts[1].strip()
     data = load_scammers()
     if name in data:
         del data[name]
         save_scammers(data)
-        bot.send_message(msg.chat.id, f"🗑 *{name}* удалён.")
+        send_with_banner(msg.chat.id, f"🗑 *{name}* удалён.", banner_type="skam", parse_mode="Markdown")
     else:
-        bot.send_message(msg.chat.id, "❌ Не найден в списке.")
+        send_with_banner(msg.chat.id, "❌ Не найден в списке.", banner_type="skam")
 
 @bot.message_handler(commands=['skam'])
 def list_scam(msg):
@@ -254,16 +252,20 @@ def list_scam(msg):
     if not data:
         send_with_banner(msg.chat.id, "🛡️ Список пуст", banner_type="skam")
         return
-    
     txt = "🚫 *SCAM LIST*\n\n"
     for i, (k, v) in enumerate(data.items(), 1):
         txt += f"{i}. 👤 *{k}*\n🔗 {v}\n\n"
-    
+    # Для списка скамеров лучше использовать Markdown (V1), так как V2 падает на ссылках
     send_with_banner(msg.chat.id, txt, banner_type="skam", parse_mode="Markdown", disable_web_page_preview=True)
 
-# ---------------- ЗАПУСК ----------------
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
     keep_alive()
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+    except:
+        pass
     print("Bot started")
     bot.infinity_polling()
                 
