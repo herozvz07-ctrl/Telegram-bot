@@ -185,52 +185,59 @@ def buy_gold_menu(call):
         reply_markup=kb
     )
 
-# -------- GUILD (Твой оригинальный текст) --------
+# -------- GUILD (Исправленный блок для групп) --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
-    parts = msg.text.split(" ",1)
-    if len(parts) < 2:
-        bot.reply_to(
-            msg,
-            "🔴 `УКАЖИ НАЗВАНИЕ ГИЛЬДИИ`\n\nПример:\n`/guild Imperia Of Titans`",
-            parse_mode="Markdown"
+    try:
+        parts = msg.text.split(" ", 1)
+        if len(parts) < 2:
+            bot.reply_to(
+                msg,
+                "🔴 `УКАЖИ НАЗВАНИЕ ГИЛЬДИИ`\n\nПример:\n`/guild Imperia Of Titans`",
+                parse_mode="Markdown"
+            )
+            return
+
+        name = parts[1].strip()
+        url = f"https://www.rucoyonline.com/guild/{quote(name)}"
+
+        # Добавлена проверка таймаута (5 секунд), чтобы бот не вис
+        r = requests.get(url, headers=HEADERS, timeout=5)
+        
+        if r.status_code != 200:
+            bot.reply_to(msg, "Гильдия не найдена 📛")
+            return
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        text_all = soup.get_text("\n", strip=True)
+
+        created = re.search(r"Founded on ([A-Za-z0-9 ,]+)", text_all)
+        created = created.group(1) if created else "Не указано"
+
+        members_rows = soup.find_all("tr")
+        members_count = sum(1 for r in members_rows if r.find_all("td"))
+
+        desc = extract_description(soup, name)
+
+        # Экранируем спецсимволы, чтобы Markdown не ломался
+        desc_clean = desc.replace("```", "`\u200b``")
+
+        reply = (
+            f"⚔️ *{name}*\n"
+            f"👥 Members: *{members_count}*\n"
+            f"📅 Created: *{created}*\n\n"
+            f"```\n{desc_clean}\n```\n"
+            f"🔗 {url}"
         )
-        return
 
-    name = parts[1].strip()
-    url = f"https://www.rucoyonline.com/guild/{quote(name)}"
+        bot.reply_to(msg, reply, parse_mode="Markdown", disable_web_page_preview=True)
 
-
-    bot.send_message(
-        call.message.chat.id,
-        gold_text,
-        parse_mode="Markdown",
-        reply_markup=kb
-    )(url, headers=HEADERS)
-    if r.status_code != 200:
-        bot.reply_to(msg, "Гильдия не найдена 📛")
-        return
-
-    soup = BeautifulSoup(r.text,"html.parser")
-    text = soup.get_text("\n",strip=True)
-
-    created = re.search(r"Founded on ([A-Za-z0-9 ,]+)", text)
-    created = created.group(1) if created else "Не указано"
-
-    members = soup.find_all("tr")
-    members = sum(1 for r in members if r.find_all("td"))
-
-    desc = extract_description(soup, name)
-
-    reply = (
-        f"⚔️ *{name}*\n"
-        f"👥 Members: *{members}*\n"
-        f"📅 Created: *{created}*\n\n"
-        f"```\n{desc}\n```\n"
-        f"🔗 {url}"
-    )
-
-    bot.reply_to(msg, reply, parse_mode="Markdown", disable_web_page_preview=True)
+    except requests.exceptions.Timeout:
+        bot.reply_to(msg, "⚠️ Ошибка: Сайт Rucoy не отвечает (Таймаут).")
+    except Exception as e:
+        print(f"Ошибка в команде guild: {e}")
+        bot.reply_to(msg, "❌ Произошла ошибка при поиске гильдии.")
+        
 
 # -------- USER (Твой оригинальный текст) --------
 @bot.message_handler(commands=['user'])
