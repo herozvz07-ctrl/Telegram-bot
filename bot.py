@@ -129,45 +129,6 @@ def send_calculator(call):
         bot.send_message(call.message.chat.id, f"❌ Не удалось переслать файл: {e}")
 
 @bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
-def buy_gold_menu(call):
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
-    kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
-    bot.send_message(
-        call.message.chat.id,
-        ""💰 Покупка Gold\n\n"
-"🇷🇺 Россия (RUB)\n"
-"> 20₽ = 1kk Gold\n"
-"> 100₽ = 5kk\n"
-"> 500₽ = 25kk\n"
-"> 1000₽ = 50kk\n\n"
-
-"🇺🇦 Украина (UAH)\n"
-"> 3₴ = 1kk Gold\n"
-"> 15₴ = 5kk\n"
-"> 75₴ = 25kk\n"
-"> 150₴ = 50kk\n\n"
-
-"🇰🇿 Казахстан (KZT)\n"
-"> 10₸ = 1kk Gold\n"
-"> 50₸ = 5kk\n"
-"> 250₸ = 25kk\n"
-"> 500₸ = 50kk\n\n"
-
-"🇧🇾 Беларусь (BYN)\n"
-"> 0.70 BYN = 1kk Gold\n"
-"> 3.50 BYN = 5kk\n"
-"> 17.50 BYN = 25kk\n"
-"> 35 BYN = 50kk\n\n"
-
-"🇺🇸 Доллар (USD)\n"
-"> $0.25 = 1kk Gold\n"
-"> $1.25 = 5kk\n"
-"> $6.25 = 25kk\n"
-"> $12.50 = 50kk\n\n"",
-        parse_mode="Markdown",
-        reply_markup=kb
-    )
 
 @bot.callback_query_handler(func=lambda c: c.data == "gold_rates")
 def gold_rates(call):
@@ -196,7 +157,52 @@ def guild(msg):
     name = parts[1].strip()
     url = f"https://www.rucoyonline.com/guild/{quote(name)}"
 
-    r = requests.get(url, headers=HEADERS)
+    r = requests.get@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
+def buy_gold_menu(call):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
+    kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
+
+    gold_text = (
+        "💰 *Покупка Gold*\n\n"
+
+        "🇷🇺 *Россия (RUB)*\n"
+        "> 20₽ = *1kk Gold*\n"
+        "> 100₽ = *5kk*\n"
+        "> 500₽ = *25kk*\n"
+        "> 1000₽ = *50kk*\n\n"
+
+        "🇺🇦 *Украина (UAH)*\n"
+        "> 3₴ = *1kk Gold*\n"
+        "> 15₴ = *5kk*\n"
+        "> 75₴ = *25kk*\n"
+        "> 150₴ = *50kk*\n\n"
+
+        "🇰🇿 *Казахстан (KZT)*\n"
+        "> 10₸ = *1kk Gold*\n"
+        "> 50₸ = *5kk*\n"
+        "> 250₸ = *25kk*\n"
+        "> 500₸ = *50kk*\n\n"
+
+        "🇧🇾 *Беларусь (BYN)*\n"
+        "> 0.70 BYN = *1kk Gold*\n"
+        "> 3.50 BYN = *5kk*\n"
+        "> 17.50 BYN = *25kk*\n"
+        "> 35 BYN = *50kk*\n\n"
+
+        "🇺🇸 *Доллар (USD)*\n"
+        "> $0.25 = *1kk Gold*\n"
+        "> $1.25 = *5kk*\n"
+        "> $6.25 = *25kk*\n"
+        "> $12.50 = *50kk*\n"
+    )
+
+    bot.send_message(
+        call.message.chat.id,
+        gold_text,
+        parse_mode="Markdown",
+        reply_markup=kb
+    )(url, headers=HEADERS)
     if r.status_code != 200:
         bot.reply_to(msg, "Гильдия не найдена 📛")
         return
