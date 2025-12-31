@@ -142,6 +142,49 @@ def info_callback(call):
         parse_mode="Markdown"
     )
 
+@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
+def buy_gold_menu(call):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
+    kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
+
+    gold_text = (
+        "💰 *Покупка Gold*\n\n"
+        "🇷🇺 *Россия (RUB)*\n"
+        "> 20₽ = *1kk Gold*\n"
+        "> 100₽ = *5kk*\n"
+        "> 500₽ = *25kk*\n"
+        "> 1000₽ = *50kk*\n\n"
+        "🇺🇦 *Украина (UAH)*\n"
+        "> 3₴ = *1kk Gold*\n"
+        "> 15₴ = *5kk*\n"
+        "> 75₴ = *25kk*\n"
+        "> 150₴ = *50kk*\n\n"
+        "🇰🇿 *Казахстан (KZT)*\n"
+        "> 10₸ = *1kk Gold*\n"
+        "> 50₸ = *5kk*\n"
+        "> 250₸ = *25kk*\n"
+        "> 500₸ = *50kk*\n\n"
+        "🇧🇾 *Беларусь (BYN)*\n"
+        "> 0.70 BYN = *1kk Gold*\n"
+        "> 3.50 BYN = *5kk*\n"
+        "> 17.50 BYN = *25kk*\n"
+        "> 35 BYN = *50kk*\n\n"
+        "🇺🇸 *Доллар (USD)*\n"
+        "> $0.25 = *1kk Gold*\n"
+        "> $1.25 = *5kk*\n"
+        "> $6.25 = *25kk*\n"
+        "> $12.50 = *50kk*\n"
+    )
+
+    bot.edit_message_text(
+        gold_text,
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode="Markdown",
+        reply_markup=kb
+    )
+
 # -------- GUILD (Твой оригинальный текст) --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
@@ -157,45 +200,6 @@ def guild(msg):
     name = parts[1].strip()
     url = f"https://www.rucoyonline.com/guild/{quote(name)}"
 
-    r = requests.get@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
-def buy_gold_menu(call):
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
-    kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
-
-    gold_text = (
-        "💰 *Покупка Gold*\n\n"
-
-        "🇷🇺 *Россия (RUB)*\n"
-        "> 20₽ = *1kk Gold*\n"
-        "> 100₽ = *5kk*\n"
-        "> 500₽ = *25kk*\n"
-        "> 1000₽ = *50kk*\n\n"
-
-        "🇺🇦 *Украина (UAH)*\n"
-        "> 3₴ = *1kk Gold*\n"
-        "> 15₴ = *5kk*\n"
-        "> 75₴ = *25kk*\n"
-        "> 150₴ = *50kk*\n\n"
-
-        "🇰🇿 *Казахстан (KZT)*\n"
-        "> 10₸ = *1kk Gold*\n"
-        "> 50₸ = *5kk*\n"
-        "> 250₸ = *25kk*\n"
-        "> 500₸ = *50kk*\n\n"
-
-        "🇧🇾 *Беларусь (BYN)*\n"
-        "> 0.70 BYN = *1kk Gold*\n"
-        "> 3.50 BYN = *5kk*\n"
-        "> 17.50 BYN = *25kk*\n"
-        "> 35 BYN = *50kk*\n\n"
-
-        "🇺🇸 *Доллар (USD)*\n"
-        "> $0.25 = *1kk Gold*\n"
-        "> $1.25 = *5kk*\n"
-        "> $6.25 = *25kk*\n"
-        "> $12.50 = *50kk*\n"
-    )
 
     bot.send_message(
         call.message.chat.id,
