@@ -128,8 +128,6 @@ def send_calculator(call):
     except Exception as e:
         bot.send_message(call.message.chat.id, f"❌ Не удалось переслать файл: {e}")
 
-@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
-
 @bot.callback_query_handler(func=lambda c: c.data == "info")
 def info_callback(call):
     bot.send_message(
@@ -139,6 +137,8 @@ def info_callback(call):
     )
 
 # -------- BUY GOLD (Твой расширенный текст с ценами) --------
+@bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
+
 @bot.callback_query_handler(func=lambda c: c.data == "gold_rates")
 def gold_rates(call):
     try:
