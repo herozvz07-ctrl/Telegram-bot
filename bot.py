@@ -132,7 +132,8 @@ def send_calculator(call):
 
 @bot.callback_query_handler(func=lambda c: c.data == "gold_rates")
 def gold_rates(call):
-    bot.send_message(call.message.chat.id, "📊 *Курсы Gold*\n\nЛучшие трейдеры и цены скоро здесь.", parse_mode="Markdown")
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "📊 *Курсы Gold*\n\nЛучшие трейдеры скоро здесь.", parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda c: c.data == "info")
 def info_callback(call):
