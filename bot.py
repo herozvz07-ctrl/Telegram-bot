@@ -170,25 +170,40 @@ def gold_rates(call):
 def gold_command(message):
     try:
         text = (
-            "💰 <b>Покупка Gold</b>\n\n"
+            "💰 *Покупка Gold*\n\n"
 
-            "🇷🇺 <b>Россия (RUB)</b>\n"
-            "20₽ = 1kk Gold\n100₽ = 5kk\n500₽ = 25kk\n1000₽ = 50kk\n\n"
+            "🇷🇺 *Россия (RUB)*\n"
+            "`20₽ = 1kk Gold`\n"
+            "`100₽ = 5kk`\n"
+            "`500₽ = 25kk`\n"
+            "`1000₽ = 50kk`\n\n"
 
-            "🇺🇦 <b>Украина (UAH)</b>\n"
-            "3₴ = 1kk Gold\n15₴ = 5kk\n75₴ = 25kk\n150₴ = 50kk\n\n"
+            "🇺🇦 *Украина (UAH)*\n"
+            "`3₴ = 1kk Gold`\n"
+            "`15₴ = 5kk`\n"
+            "`75₴ = 25kk`\n"
+            "`150₴ = 50kk`\n\n"
 
-            "🇰🇿 <b>Казахстан (KZT)</b>\n"
-            "10₸ = 1kk Gold\n50₸ = 5kk\n250₸ = 25kk\n500₸ = 50kk\n\n"
+            "🇰🇿 *Казахстан (KZT)*\n"
+            "`10₸ = 1kk Gold`\n"
+            "`50₸ = 5kk`\n"
+            "`250₸ = 25kk`\n"
+            "`500₸ = 50kk`\n\n"
 
-            "🇧🇾 <b>Беларусь (BYN)</b>\n"
-            "0.70 BYN = 1kk Gold\n3.50 BYN = 5kk\n17.50 BYN = 25kk\n35 BYN = 50kk\n\n"
+            "🇧🇾 *Беларусь (BYN)*\n"
+            "`0.70 BYN = 1kk Gold`\n"
+            "`3.50 BYN = 5kk`\n"
+            "`17.50 BYN = 25kk`\n"
+            "`35 BYN = 50kk`\n\n"
 
-            "🇺🇸 <b>USD</b>\n"
-            "$0.25 = 1kk Gold\n$1.25 = 5kk\n$6.25 = 25kk\n$12.50 = 50kk"
+            "🇺🇸 *USD*\n"
+            "`$0.25 = 1kk Gold`\n"
+            "`$1.25 = 5kk`\n"
+            "`$6.25 = 25kk`\n"
+            "`$12.50 = 50kk`"
         )
 
-        bot.send_message(message.chat.id, text, parse_mode="HTML")
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
     except Exception as e:
         print("Ошибка /gold:", e)
         
