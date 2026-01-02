@@ -166,7 +166,7 @@ def gold_rates(call):
     )
     bot.answer_callback_query(call.id)
 
-@bot.message_handler(commands=['gold'])
+@bot.message_handler(commands=['price'])
 def gold_command(message):
     try:
         text = (
