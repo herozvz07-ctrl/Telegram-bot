@@ -165,7 +165,47 @@ def gold_rates(call):
         parse_mode="Markdown"
     )
     bot.answer_callback_query(call.id)
+
+# -------- КОМАНДА /gold ДЛЯ ГРУПП --------
+@bot.message_handler(commands=['gold'])
+def gold_command(message):
+    try:
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        kb.add(
+            types.InlineKeyboardButton("📊 Курсы и трейдеры", callback_data="gold_rates"),
+            types.InlineKeyboardButton("➕ Подробнее в канале", url="https://t.me/Bancus_Rucoy/159")
+        )
         
+        # Тот же текст, что и в кнопке
+        text = (
+            "💰 <b>Покупка Gold</b>\n\n"
+            
+            "🇷🇺 <b>Россия (RUB)</b>\n"
+            "<blockquote>20₽ = 1kk Gold\n100₽ = 5kk\n500₽ = 25kk\n1000₽ = 50kk</blockquote>\n"
+
+            "🇺🇦 <b>Украина (UAH)</b>\n"
+            "<blockquote>3₴ = 1kk Gold\n15₴ = 5kk\n75₴ = 25kk\n150₴ = 50kk</blockquote>\n"
+
+            "🇰🇿 <b>Казахстан (KZT)</b>\n"
+            "<blockquote>10₸ = 1kk Gold\n50₸ = 5kk\n250₸ = 25kk\n500₸ = 50kk</blockquote>\n"
+
+            "🇧🇾 <b>Беларусь (BYN)</b>\n"
+            "<blockquote>0.70 BYN = 1kk Gold\n3.50 BYN = 5kk\n17.50 BYN = 25kk\n35 BYN = 50kk</blockquote>\n"
+
+            "🇺🇸 <b>Доллар (USD)</b>\n"
+            "<blockquote>$0.25 = 1kk Gold\n$1.25 = 5kk\n$6.25 = 25kk\n$12.50 = 50kk</blockquote>"
+        )
+        
+        # В группах лучше слать новое сообщение
+        bot.send_message(
+            message.chat.id, 
+            text, 
+            parse_mode="HTML", 
+            reply_markup=kb
+        )
+    except Exception as e:
+        print(f"Error in /gold command: {e}")
+
 # -------- GUILD (Исправленный блок для групп) --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
