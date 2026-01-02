@@ -157,9 +157,21 @@ def gold_command(message):
             "`$12.50 = 50kk`"
         )
 
-        bot.send_message(message.chat.id, text, parse_mode="Markdown")
+        # Самый надёжный способ для групп
+        bot.reply_to(message, text, parse_mode="Markdown")
+
+        # Альтернативный вариант (если хочется без кавычки ответа):
+        # bot.send_message(
+        #     message.chat.id,
+        #     text,
+        #     parse_mode="Markdown",
+        #     reply_to_message_id=message.message_id
+        # )
+
     except Exception as e:
-        print("Ошибка /gold:", e)
+        print("Ошибка в команде /gold:", e)
+        # Даже в случае ошибки лучше ответить, чем молчать
+        bot.reply_to(message, "❌ Не удалось отправить информацию о ценах на Gold")
 
 # Обработчики кнопок меню
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
