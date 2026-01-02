@@ -120,6 +120,47 @@ def send_start(message):
         reply_markup=kb
     )
 
+@bot.message_handler(commands=['gold'])
+def gold_command(message):
+    try:
+        text = (
+            "💰 *Покупка Gold*\n\n"
+
+            "🇷🇺 *Россия (RUB)*\n"
+            "`20₽ = 1kk Gold`\n"
+            "`100₽ = 5kk`\n"
+            "`500₽ = 25kk`\n"
+            "`1000₽ = 50kk`\n\n"
+
+            "🇺🇦 *Украина (UAH)*\n"
+            "`3₴ = 1kk Gold`\n"
+            "`15₴ = 5kk`\n"
+            "`75₴ = 25kk`\n"
+            "`150₴ = 50kk`\n\n"
+
+            "🇰🇿 *Казахстан (KZT)*\n"
+            "`10₸ = 1kk Gold`\n"
+            "`50₸ = 5kk`\n"
+            "`250₸ = 25kk`\n"
+            "`500₸ = 50kk`\n\n"
+
+            "🇧🇾 *Беларусь (BYN)*\n"
+            "`0.70 BYN = 1kk Gold`\n"
+            "`3.50 BYN = 5kk`\n"
+            "`17.50 BYN = 25kk`\n"
+            "`35 BYN = 50kk`\n\n"
+
+            "🇺🇸 *USD*\n"
+            "`$0.25 = 1kk Gold`\n"
+            "`$1.25 = 5kk`\n"
+            "`$6.25 = 25kk`\n"
+            "`$12.50 = 50kk`"
+        )
+
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    except Exception as e:
+        print("Ошибка /gold:", e)
+
 # Обработчики кнопок меню
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
@@ -165,47 +206,6 @@ def gold_rates(call):
         parse_mode="Markdown"
     )
     bot.answer_callback_query(call.id)
-
-@bot.message_handler(commands=['price'])
-def gold_command(message):
-    try:
-        text = (
-            "💰 *Покупка Gold*\n\n"
-
-            "🇷🇺 *Россия (RUB)*\n"
-            "`20₽ = 1kk Gold`\n"
-            "`100₽ = 5kk`\n"
-            "`500₽ = 25kk`\n"
-            "`1000₽ = 50kk`\n\n"
-
-            "🇺🇦 *Украина (UAH)*\n"
-            "`3₴ = 1kk Gold`\n"
-            "`15₴ = 5kk`\n"
-            "`75₴ = 25kk`\n"
-            "`150₴ = 50kk`\n\n"
-
-            "🇰🇿 *Казахстан (KZT)*\n"
-            "`10₸ = 1kk Gold`\n"
-            "`50₸ = 5kk`\n"
-            "`250₸ = 25kk`\n"
-            "`500₸ = 50kk`\n\n"
-
-            "🇧🇾 *Беларусь (BYN)*\n"
-            "`0.70 BYN = 1kk Gold`\n"
-            "`3.50 BYN = 5kk`\n"
-            "`17.50 BYN = 25kk`\n"
-            "`35 BYN = 50kk`\n\n"
-
-            "🇺🇸 *USD*\n"
-            "`$0.25 = 1kk Gold`\n"
-            "`$1.25 = 5kk`\n"
-            "`$6.25 = 25kk`\n"
-            "`$12.50 = 50kk`"
-        )
-
-        bot.send_message(message.chat.id, text, parse_mode="Markdown")
-    except Exception as e:
-        print("Ошибка /gold:", e)
         
 # -------- GUILD (Исправленный блок для групп) --------
 @bot.message_handler(commands=['guild'])
