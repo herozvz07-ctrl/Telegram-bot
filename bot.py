@@ -127,34 +127,20 @@ def gold_command(message):
             "💰 *Покупка Gold*\n\n"
 
             "🇷🇺 *Россия (RUB)*\n"
-            "`20₽ = 1kk Gold`\n"
-            "`100₽ = 5kk`\n"
-            "`500₽ = 25kk`\n"
-            "`1000₽ = 50kk`\n\n"
-
+            "`20₽ = 1kk Gold`\n\n"
+            
             "🇺🇦 *Украина (UAH)*\n"
-            "`3₴ = 1kk Gold`\n"
-            "`15₴ = 5kk`\n"
-            "`75₴ = 25kk`\n"
-            "`150₴ = 50kk`\n\n"
-
+            "`11₴ = 1kk Gold`\n\n"
+            
             "🇰🇿 *Казахстан (KZT)*\n"
-            "`10₸ = 1kk Gold`\n"
-            "`50₸ = 5kk`\n"
-            "`250₸ = 25kk`\n"
-            "`500₸ = 50kk`\n\n"
-
+            "`130₸ = 1kk Gold`\n\n"
+            
             "🇧🇾 *Беларусь (BYN)*\n"
-            "`0.70 BYN = 1kk Gold`\n"
-            "`3.50 BYN = 5kk`\n"
-            "`17.50 BYN = 25kk`\n"
-            "`35 BYN = 50kk`\n\n"
-
+            "`0.8 BYN = 1kk Gold`\n\n"
+            
             "🇺🇸 *USD*\n"
-            "`$0.25 = 1kk Gold`\n"
-            "`$1.25 = 5kk`\n"
-            "`$6.25 = 25kk`\n"
-            "`$12.50 = 50kk`"
+            "`$0.3 = 1kk Gold`\n"
+            
         )
 
         # Самый надёжный способ для групп
@@ -201,7 +187,7 @@ def buy_gold_menu(call):
     try:
         bot.send_message(
             call.message.chat.id,
-            "💰 Покупка Gold\n\n 🇷🇺 Россия (RUB)\n > 20₽ = 1kk Gold\n > 100₽ = 5kk\n > 500₽ = 25kk\n > 1000₽ = 50kk\n\n 🇺🇦 Украина (UAH)\n > 3₴ = 1kk Gold\n > 15₴ = 5kk\n > 75₴ = 25kk\n > 150₴ = 50kk\n\n 🇰🇿 Казахстан (KZT)\n > 10₸ = 1kk Gold\n > 50₸ = 5kk\n > 250₸ = 25kk\n > 500₸ = 50kk\n\n 🇧🇾 Беларусь (BYN)\n > 0.70 BYN = 1kk Gold\n > 3.50 BYN = 5kk\n > 17.50 BYN = 25kk\n > 35 BYN = 50kk\n\n 🇺🇸 Доллар (USD)\n > $0.25 = 1kk Gold\n > $1.25 = 5kk\n > $6.25 = 25kk\n > $12.50 = 50kk\n\n",
+            "💰 Покупка Gold\n\n 🇷🇺 Россия (RUB)\n > 20₽ = 1kk Gold\n\n 🇺🇦 Украина (UAH)\n > 11₴ = 1kk Gold\n\n 🇰🇿 Казахстан (KZT)\n > 130₸ = 1kk Gold\n\n 🇧🇾 Беларусь (BYN)\n > 0.8 BYN = 1kk Gold\n\n 🇺🇸 Доллар (USD)\n > $0.3 = 1kk Gold",
             parse_mode="Markdown",
             reply_markup=kb
         )
