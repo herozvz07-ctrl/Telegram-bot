@@ -621,5 +621,21 @@ def list_scam(msg):
         txt = "🚫 *SCAM LIST*\n\n"
         for i, (k, v) in enumerate(data.items(), 1):
             clean_name = k.replace("_", "\\_").replace("*", "")
-            clean_link = v.replace("_", "\\_")
+            txt += f"{i}. {clean_name}: [Ссылка]({v})\n"
+            
+        bot.reply_to(msg, txt, parse_mode="Markdown", disable_web_page_preview=True)
+    except Exception as e:
+        print(f"Ошибка в /skam: {e}")
+        bot.reply_to(msg, "❌ Не удалось загрузить список")
+
+# ----------------HeroDolbayop не трогай тут ничего----------------
+
+if __name__ == "__main__":
+    # 1. Запускаем веб-сервер для Render (чтобы не засыпал)
+    keep_alive()
+    
+    # 2. Запускаем самого бота
+    print("✅ Бот запущен и готов к работе!")
+    bot.polling(none_stop=True)
+    
       
