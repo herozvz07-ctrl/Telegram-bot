@@ -547,19 +547,19 @@ def guild(msg):
 # -------- USER --------
 @bot.message_handler(commands=['user'])
 def user(msg):
+    parts = msg.text.split(" ", 1)
+    if len(parts) < 2:
+        bot.reply_to(
+            msg,
+            "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
+            parse_mode="Markdown"
+        )
+        return
+
+    name = parts[1].strip()
+    url = f"https://www.rucoyonline.com/characters/{quote(name)}"
+
     try:
-        parts = msg.text.split(" ", 1)
-        if len(parts) < 2:
-            bot.reply_to(
-                msg,
-                "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
-                parse_mode="Markdown"
-            )
-            return
-
-        name = parts[1].strip()
-        url = f"https://www.rucoyonline.com/characters/{quote(name)}"
-
         r = requests.get(url, headers=HEADERS, timeout=5)
         if r.status_code != 200:
             bot.reply_to(msg, "Игрок не найден 📛")
@@ -621,4 +621,5 @@ def list_scam(msg):
         txt = "🚫 *SCAM LIST*\n\n"
         for i, (k, v) in enumerate(data.items(), 1):
             clean_name = k.replace("_", "\\_").replace("*", "")
-            c
+            clean_link = v.replace("_", "\\_")
+      
