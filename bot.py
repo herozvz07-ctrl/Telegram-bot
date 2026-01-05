@@ -126,6 +126,43 @@ def send_start(message):
         reply_markup=kb
     )
 
+#--------Bank-----------
+
+def get_balance(uid):
+    u = bank_db.find_one({"_id": uid})
+    return u["balance"] if u else 0
+
+def add_balance(uid, amount):
+    bank_db.update_one(
+        {"_id": uid},
+        {"$inc": {"balance": amount}},
+        upsert=True
+    )
+
+@bot.message_handler(commands=['ungive'])
+def ungive(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        return
+
+    _, uid, amount = msg.text.split()
+    add_balance(uid, -int(amount))
+
+    bot.send_message(uid, f"❌ Списано {amount}")
+    bot.send_message(msg.chat.id, "✅")
+
+@bot.message_handler(commands=['give'])
+def give(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        return
+
+    _, uid, amount = msg.text.split()
+    add_balance(uid, int(amount))
+
+    bot.send_message(uid, f"💰 Вам начислено {amount}")
+    bot.send_message(msg.chat.id, "✅")
+
+#------Gold---------------
+
 @bot.message_handler(commands=['gold'])
 def gold_command(message):
     try:
