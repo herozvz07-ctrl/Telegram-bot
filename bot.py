@@ -11,11 +11,6 @@ from flask import Flask
 from threading import Thread
 from pymongo import MongoClient
 
-mongo = MongoClient(os.getenv("MONGO_URI"))
-db = mongo["rucoy"]
-bank_db = db["bank"]
-scam_db = db["scammers"]
-
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_USERNAME = "herozvz"
@@ -127,6 +122,12 @@ def send_start(message):
     )
 
 #--------Bank-----------
+
+mongo = MongoClient(os.getenv("MONGO_URI"))
+db = mongo["rucoy"]
+bank_db = db["bank"]
+scam_db = db["scammers"]
+
 # -------- BANK SYSTEM --------
 
 pending_gifts = {}
