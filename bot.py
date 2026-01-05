@@ -11,261 +11,228 @@ from flask import Flask
 from threading import Thread
 from pymongo import MongoClient
 
-# ---------------- Конфигурация ----------------
+---------------- CONFIG ----------------
+
 TOKEN = os.getenv("BOT_TOKEN")
+MONGO_URI = os.getenv("MONGO_URI")
 ADMIN_USERNAME = "herozvz"
 SCAM_FILE = "scammers.json"
 
-if not TOKEN:
-    raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
+if not TOKEN or not MONGO_URI:
+raise ValueError("BOT_TOKEN или MONGO_URI не найдены! Проверь переменные окружения Render.")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# Ссылка на банер для меню /start
-START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
-
-# ---------------- SCAM STORAGE ----------------
-def load_scammers():
-    try:
-        if os.path.exists(SCAM_FILE):
-            with open(SCAM_FILE, "r", encoding="utf-8") as f:
-                data = f.read().strip()
-                if data:
-                    return json.loads(data)
-    except:
-        pass
-    return {}
-
-def save_scammers(data):
-    with open(SCAM_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-# ---------------- RENDER KEEP ALIVE ----------------
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Bot is alive!"
-
-def run_web_server():
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-def keep_alive():
-    Thread(target=run_web_server, daemon=True).start()
-
-# ---------------- PARSING ----------------
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"
-}
-
-MENU_WORDS = {
-    "le navigation","rucoy online","welcome","news","highscores",
-    "characters","guilds","sign in","sign in with google","sign in with apple"
-}
-
-def remove_adjacent_duplicates(lines):
-    out = []
-    for l in lines:
-        if not out or l != out[-1]:
-            out.append(l)
-    return out
-
-def remove_repeated_block(lines):
-    n = len(lines)
-    for k in range(1, n//2 + 1):
-        if lines[:k] == lines[k:2*k]:
-            return lines[k:]
-    return lines
-
-def extract_description(soup, name):
-    text = soup.get_text("\n", strip=True)
-    idx = text.lower().find(name.lower())
-    chunk = ""
-    if idx != -1:
-        start = idx + len(name)
-        m = re.search(r"(Founded on|Members)", text[start:], re.I)
-        end = start + m.start() if m else len(text)
-        chunk = text[start:end]
-    if not chunk:
-        return "Нет описания"
-
-    lines = [l.strip() for l in chunk.split("\n") if l.strip()]
-    lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
-    lines = remove_adjacent_duplicates(lines)
-    lines = remove_repeated_block(lines)
-    return "\n".join(lines) if lines else "Нет описания"
-
-# ---------------- COMMANDS ----------------
-
-# Новое меню при команде /start
-@bot.message_handler(commands=['start'])
-def send_start(message):
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(types.InlineKeyboardButton("➕ Добавить в группу", url="https://t.me/rucoy_online_robot?startgroup=interface"))
-    kb.add(
-        types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
-        types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
-    )
-    kb.add(types.InlineKeyboardButton("🧮 Calculator", callback_data="calc"))
-    kb.add(
-        types.InlineKeyboardButton("💰 Купить Gold", callback_data="buy_gold"),
-        types.InlineKeyboardButton("📤 Продать Gold", url="https://t.me/Bancus_Rucoy/159")
-    )
-    kb.add(types.InlineKeyboardButton("ℹ️ Информация", callback_data="info"))
-
-    bot.send_photo(
-        message.chat.id,
-        START_BANNER,
-        caption="⚔️ *Rucoy Hub*\n\nВыберите раздел:",
-        parse_mode="Markdown",
-        reply_markup=kb
-    )
-
-#--------Bank-----------
-
-mongo = MongoClient(os.getenv("MONGO_URI"))
+mongo = MongoClient(MONGO_URI)
 db = mongo["rucoy"]
 bank_db = db["bank"]
 scam_db = db["scammers"]
 
-# -------- BANK SYSTEM --------
+START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
+
+---------------- SCAM STORAGE ----------------
+
+def load_scammers():
+if os.path.exists(SCAM_FILE):
+with open(SCAM_FILE, "r", encoding="utf-8") as f:
+data = f.read().strip()
+if data:
+return json.loads(data)
+return {}
+
+def save_scammers(data):
+with open(SCAM_FILE, "w", encoding="utf-8") as f:
+json.dump(data, f, ensure_ascii=False, indent=4)
+
+---------------- RENDER KEEP ALIVE ----------------
+
+app = Flask('')
+
+@app.route('/')
+def home():
+return "Bot is alive!"
+
+def run_web_server():
+app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+def keep_alive():
+Thread(target=run_web_server, daemon=True).start()
+
+---------------- PARSING ----------------
+
+HEADERS = {"User-Agent": "Mozilla/5.0"}
+MENU_WORDS = {"le navigation","rucoy online","welcome","news","highscores",
+"characters","guilds","sign in","sign in with google","sign in with apple"}
+
+def remove_adjacent_duplicates(lines):
+out = []
+for l in lines:
+if not out or l != out[-1]:
+out.append(l)
+return out
+
+def remove_repeated_block(lines):
+n = len(lines)
+for k in range(1, n//2 + 1):
+if lines[:k] == lines[k:2*k]:
+return lines[k:]
+return lines
+
+def extract_description(soup, name):
+text = soup.get_text("\n", strip=True)
+idx = text.lower().find(name.lower())
+chunk = ""
+if idx != -1:
+start = idx + len(name)
+m = re.search(r"(Founded on|Members)", text[start:], re.I)
+end = start + m.start() if m else len(text)
+chunk = text[start:end]
+if not chunk:
+return "Нет описания"
+lines = [l.strip() for l in chunk.split("\n") if l.strip()]
+lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
+lines = remove_adjacent_duplicates(lines)
+lines = remove_repeated_block(lines)
+return "\n".join(lines) if lines else "Нет описания"
+
+---------------- LOGIC FUNCTIONS ----------------
+
+def get_balance(uid):
+user_data = bank_db.find_one({"uid": str(uid)})
+if user_data:
+return user_data.get("balance", 0)
+return 0
+
+def add_balance(uid, amount):
+bank_db.update_one(
+{"uid": str(uid)},
+{"$inc": {"balance": amount}},
+upsert=True
+)
+
+---------------- COMMANDS ----------------
 
 pending_gifts = {}
 
-@bot.message_handler(commands=['bank'])
-def bank_profile(msg):
-    uid = str(msg.from_user.id)
-    balance = get_balance(uid)
+---------- START ----------
 
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
-        types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
-    )
-    kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
+@bot.message_handler(commands=['start'])
+def send_start(message):
+kb = types.InlineKeyboardMarkup(row_width=2)
+kb.add(types.InlineKeyboardButton("➕ Добавить в группу", url="https://t.me/rucoy_online_robot?startgroup=interface"))
+kb.add(
+types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
+types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
+)
+kb.add(types.InlineKeyboardButton("🧮 Calculator", callback_data="calc"))
+kb.add(
+types.InlineKeyboardButton("💰 Bank", callback_data="bank"),  # ✅ кнопка банка
+types.InlineKeyboardButton("💰 Купить Gold", callback_data="buy_gold")
+)
+kb.add(types.InlineKeyboardButton("ℹ️ Информация", callback_data="info"))
 
-    text = (
-        "🏦 *Ваш Bank*\n\n"
-        f"🆔 ID: `{uid}`\n"
-        f"💰 Счёт: *{balance}*"
-    )
+bot.send_photo(  
+    message.chat.id,  
+    START_BANNER,  
+    caption="⚔️ *Rucoy Hub*\n\nВыберите раздел:",  
+    parse_mode="Markdown",  
+    reply_markup=kb  
+)
 
-    bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+---------- BANK ----------
 
+@bot.callback_query_handler(func=lambda c: c.data == "bank")
+def bank_profile_callback(call):
+uid = str(call.from_user.id)
+balance = get_balance(uid)
+kb = types.InlineKeyboardMarkup(row_width=2)
+kb.add(
+types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
+types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
+)
+kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
 
-@bot.callback_query_handler(func=lambda c: c.data == "bank_withdraw")
-def bank_withdraw(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "📤 Для вывода напиши @herozvz:\n\n"
-        "`Я хочу вывести сумму`\n\n"
-        "Укажи свой ID и сумму.",
-        parse_mode="Markdown"
-    )
+text = (  
+    "🏦 *Ваш Bank*\n\n"  
+    f"🆔 ID: `{uid}`\n"  
+    f"💰 Счёт: *{balance}*"  
+)  
+bot.send_message(call.message.chat.id, text, parse_mode="Markdown", reply_markup=kb)
 
+@bot.callback_query_handler(func=lambda c: c.data.startswith("bank_"))
+def bank_actions(call):
+uid = str(call.from_user.id)
+bot.answer_callback_query(call.id)
+if c.data == "bank_withdraw":
+bot.send_message(call.message.chat.id, "📤 Для вывода напиши @herozvz:\nЯ хочу вывести сумму\nУкажи свой ID и сумму.", parse_mode="Markdown")
+elif c.data == "bank_deposit":
+bot.send_message(call.message.chat.id, "➕ Для пополнения напиши @herozvz:\nЯ хочу пополнить счёт\nУкажи свой ID и сумму.", parse_mode="Markdown")
+elif c.data == "bank_send":
+bot.send_message(call.message.chat.id, "💸 Чтобы отправить валюту:\n/gift ID сумма\nИли ответь на сообщение игрока:\n/gift сумма", parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda c: c.data == "bank_deposit")
-def bank_deposit(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "➕ Для пополнения напиши @herozvz:\n\n"
-        "`Я хочу пополнить счёт`\n\n"
-        "Укажи свой ID и сумму.",
-        parse_mode="Markdown"
-    )
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "bank_send")
-def bank_send(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "💸 Чтобы отправить валюту:\n\n"
-        "`/gift ID сумма`\n\n"
-        "Или ответь на сообщение игрока:\n"
-        "`/gift сумма`",
-        parse_mode="Markdown"
-    )
-
+---------- GIFT ----------
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
-    sender = str(msg.from_user.id)
-    sender_balance = get_balance(sender)
+sender = str(msg.from_user.id)
+sender_balance = get_balance(sender)
+if sender_balance <= 0:
+bot.reply_to(msg, "❌ У вас нет средств")
+return
 
-    if sender_balance <= 0:
-        bot.reply_to(msg, "❌ У вас нет средств")
-        return
+if msg.reply_to_message:  
+    parts = msg.text.split()  
+    if len(parts) != 2:  
+        bot.reply_to(msg, "Используй: /gift сумма")  
+        return  
+    target = str(msg.reply_to_message.from_user.id)  
+    amount = int(parts[1])  
+else:  
+    parts = msg.text.split()  
+    if len(parts) != 3:  
+        bot.reply_to(msg, "Используй: /gift ID сумма")  
+        return  
+    target = parts[1]  
+    amount = int(parts[2])  
 
-    # Ответом на сообщение
-    if msg.reply_to_message:
-        parts = msg.text.split()
-        if len(parts) != 2:
-            bot.reply_to(msg, "Используй: /gift сумма")
-            return
-        target = str(msg.reply_to_message.from_user.id)
-        amount = int(parts[1])
-    else:
-        parts = msg.text.split()
-        if len(parts) != 3:
-            bot.reply_to(msg, "Используй: /gift ID сумма")
-            return
-        target = parts[1]
-        amount = int(parts[2])
+if amount <= 0:  
+    bot.reply_to(msg, "❌ Сумма должна быть больше 0")  
+    return  
+if sender_balance < amount:  
+    bot.reply_to(msg, "❌ Недостаточно средств")  
+    return  
 
-    if amount <= 0:
-        bot.reply_to(msg, "❌ Сумма должна быть больше 0")
-        return
-
-    if sender_balance < amount:
-        bot.reply_to(msg, "❌ Недостаточно средств")
-        return
-
-    pending_gifts[sender] = (target, amount)
-
-    kb = types.InlineKeyboardMarkup()
-    kb.add(
-        types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
-        types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
-    )
-
-    bot.send_message(
-        msg.chat.id,
-        f"Вы уверены что хотите отправить *{amount}*?",
-        parse_mode="Markdown",
-        reply_markup=kb
-    )
-
+pending_gifts[sender] = (target, amount)  
+kb = types.InlineKeyboardMarkup()  
+kb.add(  
+    types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),  
+    types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")  
+)  
+bot.send_message(msg.chat.id, f"Вы уверены что хотите отправить *{amount}*?", parse_mode="Markdown", reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gift_"))
 def gift_confirm(call):
-    action, uid = call.data.split("_")[1:]
+action, uid = call.data.split("_")[1:]
+if str(call.from_user.id) != uid:
+bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
+return
+if uid not in pending_gifts:
+bot.answer_callback_query(call.id, "⏳ Время вышло")
+return
 
-    if str(call.from_user.id) != uid:
-        bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
-        return
+target, amount = pending_gifts.pop(uid)  
+if action == "no":  
+    bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)  
+    return  
 
-    if uid not in pending_gifts:
-        bot.answer_callback_query(call.id, "⏳ Время вышло")
-        return
+if get_balance(uid) < amount:  
+    bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)  
+    return  
 
-    target, amount = pending_gifts.pop(uid)
-
-    if action == "no":
-        bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
-        return
-
-    if get_balance(uid) < amount:
-        bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)
-        return
-
-    add_balance(uid, -amount)
-    add_balance(target, amount)
-
-    bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)
-    bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
+add_balance(uid, -amount)  
+add_balance(target, amount)  
+bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)  
+bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
 
 #------Gold---------------
 
