@@ -9,6 +9,8 @@ import telebot
 from telebot import types
 from flask import Flask
 from threading import Thread
+from pymongo import MongoClient  
+
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
@@ -19,6 +21,20 @@ if not TOKEN:
     raise ValueError("BOT_TOKEN не найден! Проверь переменные окружения Render.")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
+
+# Настройка MongoDB
+mongo = MongoClient(os.getenv("MONGO_URI"))
+db = mongo["rucoy"]
+bank_db = db["bank"]
+
+# Функции для работы с балансом (их не было в твоем коде)
+def get_balance(uid):
+    user_data = bank_db.find_one({"uid": str(uid)})
+    return user_data.get("balance", 0) if user_data else 0
+
+def add_balance(uid, amount):
+    bank_db.update_one({"uid": str(uid)}, {"$inc": {"balance": amount}}, upsert=True)
+    
 
 # Ссылка на банер для меню /start
 START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
