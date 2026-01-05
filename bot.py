@@ -246,32 +246,31 @@ pending_gifts = {}
 
 @bot.message_handler(commands=['bank'])
 def bank_profile(msg):
-    """Показать банковский профиль"""
-    if not bank_db:
-        bot.reply_to(msg, "❌ Банк временно недоступен (нет подключения к БД)")
+    uid = str(msg.from_user.id)
+    balance = get_balance(uid)
+
+    # Проверяем, что вернула функция: число или текст ошибки
+    if balance == "db_error":
+        bot.reply_to(msg, "❌ **Ошибка:** Бот не смог подключиться к базе данных. Проверьте MONGO_URI и доступ по IP (0.0.0.0/0).")
         return
+    elif balance == "query_error":
+        bot.reply_to(msg, "❌ **Ошибка:** База данных подключена, но не отвечает на запросы.")
+        return
+
+    # Если всё хорошо и пришло число
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
+        types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
+    )
     
-    try:
-        uid = str(msg.from_user.id)
-        balance = get_balance(uid)
-
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(
-            types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
-            types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
-        )
-        kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
-
-        text = (
-            "🏦 *Ваш Bank*\n\n"
-            f"🆔 ID: `{uid}`\n"
-            f"💰 Счёт: *{balance}*"
-        )
-
-        bot.reply_to(msg, text, parse_mode="Markdown", reply_markup=kb)
-    except Exception as e:
-        print(f"Ошибка в /bank: {e}")
-        bot.reply_to(msg, "❌ Ошибка при получении данных банка")
+    text = (
+        "🏦 *Ваш Bank*\n\n"
+        f"🆔 ID: `{uid}`\n"
+        f"💰 Счёт: *{balance}*"
+    )
+    bot.reply_to(msg, text, parse_mode="Markdown", reply_markup=kb)
+    
 
 
 @bot.callback_query_handler(func=lambda c: c.data == "bank_withdraw")
