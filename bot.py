@@ -53,35 +53,35 @@ def get_balance(uid):
     except Exception as e:
         print(f"Ошибка БД: {e}")
         return "query_error" # Ошибка во время поиска (например, таймаут)
-        
+
 def add_balance(uid, amount):
-    """Добавить/снять средства со счёта"""
-    if not bank_db:
+    if bank_db is None: 
         return False
     try:
+        # Убеждаемся, что uid - строка, а amount - целое число
         bank_db.update_one(
             {"uid": str(uid)}, 
-            {"$inc": {"balance": amount}}, 
+            {"$inc": {"balance": int(amount)}}, 
             upsert=True
         )
         return True
     except Exception as e:
-        print(f"Ошибка add_balance: {e}")
+        print(f"Ошибка в add_balance: {e}")
         return False
 
 def set_balance(uid, amount):
-    """Установить баланс (для админа)"""
-    if not bank_db:
+    if bank_db is None: 
         return False
     try:
+        # Убеждаемся, что uid - строка, а amount - целое число
         bank_db.update_one(
             {"uid": str(uid)},
-            {"$set": {"balance": amount}},
+            {"$set": {"balance": int(amount)}},
             upsert=True
         )
         return True
     except Exception as e:
-        print(f"Ошибка set_balance: {e}")
+        print(f"Ошибка в set_balance: {e}")
         return False
 
 # Ссылка на баннер для меню /start
