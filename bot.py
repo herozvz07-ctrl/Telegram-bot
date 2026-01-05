@@ -161,6 +161,69 @@ def give(msg):
     bot.send_message(uid, f"💰 Вам начислено {amount}")
     bot.send_message(msg.chat.id, "✅")
 
+pending_gifts = {}
+
+@bot.message_handler(commands=['gift'])
+def gift(msg):
+    sender = str(msg.from_user.id)
+    bank = load_bank()
+
+    if sender not in bank or bank[sender] <= 0:
+        bot.reply_to(msg, "❌ У вас нет средств")
+        return
+
+    # reply mode
+    if msg.reply_to_message:
+        target = str(msg.reply_to_message.from_user.id)
+        amount = int(msg.text.split()[1])
+    else:
+        parts = msg.text.split()
+        if len(parts) != 3:
+            bot.reply_to(msg, "/gift user_id amount")
+            return
+        target, amount = parts[1], int(parts[2])
+
+    if bank.get(sender, 0) < amount:
+        bot.reply_to(msg, "❌ Недостаточно средств")
+        return
+
+    pending_gifts[sender] = (target, amount)
+
+    kb = types.InlineKeyboardMarkup()
+    kb.add(
+        types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
+        types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
+    )
+
+    bot.send_message(msg.chat.id, f"Вы уверены что хотите отправить *{amount}* ?", parse_mode="Markdown", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("gift_"))
+def gift_confirm(call):
+    action, uid = call.data.split("_")[1:]
+
+    if str(call.from_user.id) != uid:
+        bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
+        return
+
+    if uid not in pending_gifts:
+        bot.answer_callback_query(call.id, "Истекло")
+        return
+
+    target, amount = pending_gifts.pop(uid)
+    bank = load_bank()
+
+    if action == "no":
+        bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
+        return
+
+    bank[uid] -= amount
+    bank[target] = bank.get(target, 0) + amount
+    save_bank(bank)
+
+    bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)
+    bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
+
+
 #------Gold---------------
 
 @bot.message_handler(commands=['gold'])
