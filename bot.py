@@ -127,41 +127,67 @@ def send_start(message):
     )
 
 #--------Bank-----------
-
-def get_balance(uid):
-    u = bank_db.find_one({"_id": uid})
-    return u["balance"] if u else 0
-
-def add_balance(uid, amount):
-    bank_db.update_one(
-        {"_id": uid},
-        {"$inc": {"balance": amount}},
-        upsert=True
-    )
-
-@bot.message_handler(commands=['ungive'])
-def ungive(msg):
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
-
-    _, uid, amount = msg.text.split()
-    add_balance(uid, -int(amount))
-
-    bot.send_message(uid, f"❌ Списано {amount}")
-    bot.send_message(msg.chat.id, "✅")
-
-@bot.message_handler(commands=['give'])
-def give(msg):
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
-
-    _, uid, amount = msg.text.split()
-    add_balance(uid, int(amount))
-
-    bot.send_message(uid, f"💰 Вам начислено {amount}")
-    bot.send_message(msg.chat.id, "✅")
+# -------- BANK SYSTEM --------
 
 pending_gifts = {}
+
+@bot.message_handler(commands=['bank'])
+def bank_profile(msg):
+    uid = str(msg.from_user.id)
+    balance = get_balance(uid)
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
+        types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
+    )
+    kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
+
+    text = (
+        "🏦 *Ваш Bank*\n\n"
+        f"🆔 ID: `{uid}`\n"
+        f"💰 Счёт: *{balance}*"
+    )
+
+    bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+
+
+@bot.callback_query_handler(func=lambda c: c.data == "bank_withdraw")
+def bank_withdraw(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(
+        call.message.chat.id,
+        "📤 Для вывода напиши @herozvz:\n\n"
+        "`Я хочу вывести сумму`\n\n"
+        "Укажи свой ID и сумму.",
+        parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda c: c.data == "bank_deposit")
+def bank_deposit(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(
+        call.message.chat.id,
+        "➕ Для пополнения напиши @herozvz:\n\n"
+        "`Я хочу пополнить счёт`\n\n"
+        "Укажи свой ID и сумму.",
+        parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda c: c.data == "bank_send")
+def bank_send(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(
+        call.message.chat.id,
+        "💸 Чтобы отправить валюту:\n\n"
+        "`/gift ID сумма`\n\n"
+        "Или ответь на сообщение игрока:\n"
+        "`/gift сумма`",
+        parse_mode="Markdown"
+    )
+
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
@@ -172,7 +198,7 @@ def gift(msg):
         bot.reply_to(msg, "❌ У вас нет средств")
         return
 
-    # Если ответом на сообщение
+    # Ответом на сообщение
     if msg.reply_to_message:
         parts = msg.text.split()
         if len(parts) != 2:
@@ -183,9 +209,14 @@ def gift(msg):
     else:
         parts = msg.text.split()
         if len(parts) != 3:
-            bot.reply_to(msg, "Используй: /gift user_id сумма")
+            bot.reply_to(msg, "Используй: /gift ID сумма")
             return
-        target, amount = parts[1], int(parts[2])
+        target = parts[1]
+        amount = int(parts[2])
+
+    if amount <= 0:
+        bot.reply_to(msg, "❌ Сумма должна быть больше 0")
+        return
 
     if sender_balance < amount:
         bot.reply_to(msg, "❌ Недостаточно средств")
@@ -201,7 +232,7 @@ def gift(msg):
 
     bot.send_message(
         msg.chat.id,
-        f"Вы уверены, что хотите отправить *{amount}*?",
+        f"Вы уверены что хотите отправить *{amount}*?",
         parse_mode="Markdown",
         reply_markup=kb
     )
@@ -216,7 +247,7 @@ def gift_confirm(call):
         return
 
     if uid not in pending_gifts:
-        bot.answer_callback_query(call.id, "⏳ Истекло")
+        bot.answer_callback_query(call.id, "⏳ Время вышло")
         return
 
     target, amount = pending_gifts.pop(uid)
@@ -225,7 +256,6 @@ def gift_confirm(call):
         bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
         return
 
-    # Проверка баланса ещё раз (на случай гонок)
     if get_balance(uid) < amount:
         bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)
         return
