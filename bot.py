@@ -9,8 +9,7 @@ import telebot
 from telebot import types
 from flask import Flask
 from threading import Thread
-from pymongo import MongoClient  
-
+from pymongo import MongoClient
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
@@ -22,21 +21,70 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# Настройка MongoDB
-mongo = MongoClient(os.getenv("MONGO_URI"))
-db = mongo["rucoy"]
-bank_db = db["bank"]
+# Настройка MongoDB с проверкой
+try:
+    mongo_uri = os.getenv("MONGO_URI")
+    if not mongo_uri:
+        print("⚠️ MONGO_URI не найден! Банк работать не будет.")
+        mongo = None
+        db = None
+        bank_db = None
+    else:
+        mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        # Проверка подключения
+        mongo.admin.command('ping')
+        db = mongo["rucoy"]
+        bank_db = db["bank"]
+        print("✅ MongoDB подключена успешно")
+except Exception as e:
+    print(f"❌ Ошибка подключения к MongoDB: {e}")
+    mongo = None
+    db = None
+    bank_db = None
 
-# Функции для работы с балансом (их не было в твоем коде)
+# Функции для работы с балансом (ИСПРАВЛЕНО)
 def get_balance(uid):
-    user_data = bank_db.find_one({"uid": str(uid)})
-    return user_data.get("balance", 0) if user_data else 0
+    """Получить баланс пользователя"""
+    if not bank_db:
+        return 0
+    try:
+        user_data = bank_db.find_one({"uid": str(uid)})
+        return user_data.get("balance", 0) if user_data else 0
+    except Exception as e:
+        print(f"Ошибка get_balance: {e}")
+        return 0
 
 def add_balance(uid, amount):
-    bank_db.update_one({"uid": str(uid)}, {"$inc": {"balance": amount}}, upsert=True)
-    
+    """Добавить/снять средства со счёта"""
+    if not bank_db:
+        return False
+    try:
+        bank_db.update_one(
+            {"uid": str(uid)}, 
+            {"$inc": {"balance": amount}}, 
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Ошибка add_balance: {e}")
+        return False
 
-# Ссылка на банер для меню /start
+def set_balance(uid, amount):
+    """Установить баланс (для админа)"""
+    if not bank_db:
+        return False
+    try:
+        bank_db.update_one(
+            {"uid": str(uid)},
+            {"$set": {"balance": amount}},
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Ошибка set_balance: {e}")
+        return False
+
+# Ссылка на баннер для меню /start
 START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
 # ---------------- SCAM STORAGE ----------------
@@ -112,7 +160,6 @@ def extract_description(soup, name):
 
 # ---------------- COMMANDS ----------------
 
-# Новое меню при команде /start
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -141,41 +188,22 @@ def gold_command(message):
     try:
         text = (
             "💰 *Курс Gold на данный момент*\n\n"
-
             "🇷🇺 *Россия (RUB)*\n"
             "`20₽ = 1kk Gold`\n\n"
-            
             "🇺🇦 *Украина (UAH)*\n"
             "`11₴ = 1kk Gold`\n\n"
-            
             "🇰🇿 *Казахстан (KZT)*\n"
             "`130₸ = 1kk Gold`\n\n"
-            
             "🇧🇾 *Беларусь (BYN)*\n"
             "`0.8 BYN = 1kk Gold`\n\n"
-            
             "🇺🇸 *USD*\n"
             "`$0.3 = 1kk Gold`\n"
-            
         )
-
-        # Самый надёжный способ для групп
         bot.reply_to(message, text, parse_mode="Markdown")
-
-        # Альтернативный вариант (если хочется без кавычки ответа):
-        # bot.send_message(
-        #     message.chat.id,
-        #     text,
-        #     parse_mode="Markdown",
-        #     reply_to_message_id=message.message_id
-        # )
-
     except Exception as e:
         print("Ошибка в команде /gold:", e)
-        # Даже в случае ошибки лучше ответить, чем молчать
         bot.reply_to(message, "❌ Не удалось отправить информацию о ценах на Gold")
 
-# Обработчики кнопок меню
 @bot.callback_query_handler(func=lambda c: c.data == "calc")
 def send_calculator(call):
     try:
@@ -187,23 +215,20 @@ def send_calculator(call):
 def info_callback(call):
     bot.send_message(
         call.message.chat.id,
-        "ℹ️ *Информация*\n\n📌 Команды:\n`/guild` — информация о гильдии\n`/user` — информация об игроке\n`/skam` — список скамеров\n\n👨‍💻 Создатель: @herozvz",
+        "ℹ️ *Информация*\n\n📌 Команды:\n`/guild` — информация о гильдии\n`/user` — информация об игроке\n`/skam` — список скамеров\n`/bank` — ваш банковский счёт\n\n👨‍💻 Создатель: @herozvz",
         parse_mode="Markdown"
     )
 
-# ---------- Buy Gold ----------
 @bot.callback_query_handler(func=lambda c: c.data == "buy_gold")
 def buy_gold_menu(call):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📊 Курсы и топ-трейдеры", callback_data="gold_rates"))
     kb.add(types.InlineKeyboardButton("➕ Ещё", url="https://t.me/Bancus_Rucoy/159"))
 
-    # Используем edit_message_caption, если хочешь обновить текст под баннером, 
-    # либо send_message, если нужно новое сообщение
     try:
         bot.send_message(
             call.message.chat.id,
-            "💰 курс Gold на данный момент\n\n 🇷🇺 Россия (RUB)\n > 20₽ = 1kk Gold\n\n 🇺🇦 Украина (UAH)\n > 11₴ = 1kk Gold\n\n 🇰🇿 Казахстан (KZT)\n > 130₸ = 1kk Gold\n\n 🇧🇾 Беларусь (BYN)\n > 0.8 BYN = 1kk Gold\n\n 🇺🇸 Доллар (USD)\n > $0.3 = 1kk Gold",
+            "💰 Курс Gold на данный момент\n\n🇷🇺 Россия (RUB)\n> 20₽ = 1kk Gold\n\n🇺🇦 Украина (UAH)\n> 11₴ = 1kk Gold\n\n🇰🇿 Казахстан (KZT)\n> 130₸ = 1kk Gold\n\n🇧🇾 Беларусь (BYN)\n> 0.8 BYN = 1kk Gold\n\n🇺🇸 Доллар (USD)\n> $0.3 = 1kk Gold",
             parse_mode="Markdown",
             reply_markup=kb
         )
@@ -211,7 +236,6 @@ def buy_gold_menu(call):
     except Exception as e:
         print(f"Error in buy_gold: {e}")
 
-# ---------- Gold rates ----------
 @bot.callback_query_handler(func=lambda c: c.data == "gold_rates")
 def gold_rates(call):
     bot.send_message(
@@ -221,30 +245,38 @@ def gold_rates(call):
     )
     bot.answer_callback_query(call.id)
 
-# -------- BANK SYSTEM --------
-# -------- BANK SYSTEM --------
+# -------- BANK SYSTEM (ИСПРАВЛЕНО) --------
 
 pending_gifts = {}
 
 @bot.message_handler(commands=['bank'])
 def bank_profile(msg):
-    uid = str(msg.from_user.id)
-    balance = get_balance(uid)
+    """Показать банковский профиль"""
+    if not bank_db:
+        bot.reply_to(msg, "❌ Банк временно недоступен (нет подключения к БД)")
+        return
+    
+    try:
+        uid = str(msg.from_user.id)
+        balance = get_balance(uid)
 
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
-        types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
-    )
-    kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
+        kb = types.InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
+            types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
+        )
+        kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
 
-    text = (
-        "🏦 *Ваш Bank*\n\n"
-        f"🆔 ID: `{uid}`\n"
-        f"💰 Счёт: *{balance}*"
-    )
+        text = (
+            "🏦 *Ваш Bank*\n\n"
+            f"🆔 ID: `{uid}`\n"
+            f"💰 Счёт: *{balance}*"
+        )
 
-    bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+        bot.reply_to(msg, text, parse_mode="Markdown", reply_markup=kb)
+    except Exception as e:
+        print(f"Ошибка в /bank: {e}")
+        bot.reply_to(msg, "❌ Ошибка при получении данных банка")
 
 
 @bot.callback_query_handler(func=lambda c: c.data == "bank_withdraw")
@@ -286,83 +318,182 @@ def bank_send(call):
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
-    sender = str(msg.from_user.id)
-    sender_balance = get_balance(sender)
-
-    if sender_balance <= 0:
-        bot.reply_to(msg, "❌ У вас нет средств")
+    """Отправить деньги другому пользователю"""
+    if not bank_db:
+        bot.reply_to(msg, "❌ Банк временно недоступен")
         return
+    
+    try:
+        sender = str(msg.from_user.id)
+        sender_balance = get_balance(sender)
 
-    # Ответом на сообщение
-    if msg.reply_to_message:
-        parts = msg.text.split()
-        if len(parts) != 2:
-            bot.reply_to(msg, "Используй: /gift сумма")
+        if sender_balance <= 0:
+            bot.reply_to(msg, "❌ У вас нет средств")
             return
-        target = str(msg.reply_to_message.from_user.id)
-        amount = int(parts[1])
-    else:
-        parts = msg.text.split()
-        if len(parts) != 3:
-            bot.reply_to(msg, "Используй: /gift ID сумма")
+
+        # Ответом на сообщение
+        if msg.reply_to_message:
+            parts = msg.text.split()
+            if len(parts) != 2:
+                bot.reply_to(msg, "Используй: `/gift сумма`", parse_mode="Markdown")
+                return
+            target = str(msg.reply_to_message.from_user.id)
+            try:
+                amount = int(parts[1])
+            except ValueError:
+                bot.reply_to(msg, "❌ Сумма должна быть числом")
+                return
+        else:
+            parts = msg.text.split()
+            if len(parts) != 3:
+                bot.reply_to(msg, "Используй: `/gift ID сумма`", parse_mode="Markdown")
+                return
+            target = parts[1]
+            try:
+                amount = int(parts[2])
+            except ValueError:
+                bot.reply_to(msg, "❌ Сумма должна быть числом")
+                return
+
+        if amount <= 0:
+            bot.reply_to(msg, "❌ Сумма должна быть больше 0")
             return
-        target = parts[1]
-        amount = int(parts[2])
 
-    if amount <= 0:
-        bot.reply_to(msg, "❌ Сумма должна быть больше 0")
-        return
+        if sender_balance < amount:
+            bot.reply_to(msg, "❌ Недостаточно средств")
+            return
 
-    if sender_balance < amount:
-        bot.reply_to(msg, "❌ Недостаточно средств")
-        return
+        # Нельзя отправить самому себе
+        if sender == target:
+            bot.reply_to(msg, "❌ Нельзя отправить самому себе")
+            return
 
-    pending_gifts[sender] = (target, amount)
+        pending_gifts[sender] = (target, amount)
 
-    kb = types.InlineKeyboardMarkup()
-    kb.add(
-        types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
-        types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
-    )
+        kb = types.InlineKeyboardMarkup()
+        kb.add(
+            types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
+            types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
+        )
 
-    bot.send_message(
-        msg.chat.id,
-        f"Вы уверены что хотите отправить *{amount}*?",
-        parse_mode="Markdown",
-        reply_markup=kb
-    )
+        bot.send_message(
+            msg.chat.id,
+            f"Вы уверены что хотите отправить *{amount}*?",
+            parse_mode="Markdown",
+            reply_markup=kb
+        )
+    except Exception as e:
+        print(f"Ошибка в /gift: {e}")
+        bot.reply_to(msg, "❌ Ошибка при обработке команды")
 
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gift_"))
 def gift_confirm(call):
-    action, uid = call.data.split("_")[1:]
+    """Подтверждение перевода"""
+    try:
+        action, uid = call.data.split("_", 2)[1:]
 
-    if str(call.from_user.id) != uid:
-        bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
+        if str(call.from_user.id) != uid:
+            bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
+            return
+
+        if uid not in pending_gifts:
+            bot.answer_callback_query(call.id, "⏳ Время вышло")
+            bot.edit_message_text("⏳ Время вышло", call.message.chat.id, call.message.message_id)
+            return
+
+        target, amount = pending_gifts.pop(uid)
+
+        if action == "no":
+            bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
+            bot.answer_callback_query(call.id)
+            return
+
+        # Проверяем баланс ещё раз
+        if get_balance(uid) < amount:
+            bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)
+            bot.answer_callback_query(call.id)
+            return
+
+        # Выполняем перевод
+        if add_balance(uid, -amount) and add_balance(target, amount):
+            bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)
+            try:
+                bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
+            except:
+                pass  # Если не можем отправить получателю - не страшно
+            bot.answer_callback_query(call.id, "✅ Перевод выполнен")
+        else:
+            bot.edit_message_text("❌ Ошибка транзакции", call.message.chat.id, call.message.message_id)
+            bot.answer_callback_query(call.id, "❌ Ошибка")
+    except Exception as e:
+        print(f"Ошибка в gift_confirm: {e}")
+        bot.answer_callback_query(call.id, "❌ Ошибка")
+
+
+# Админские команды для банка
+@bot.message_handler(commands=['setbalance'])
+def set_balance_cmd(msg):
+    """Установить баланс пользователю (только для админа)"""
+    if msg.from_user.username != ADMIN_USERNAME:
         return
-
-    if uid not in pending_gifts:
-        bot.answer_callback_query(call.id, "⏳ Время вышло")
+    
+    if not bank_db:
+        bot.reply_to(msg, "❌ Банк недоступен")
         return
+    
+    try:
+        parts = msg.text.split()
+        if len(parts) != 3:
+            bot.reply_to(msg, "Используй: `/setbalance ID сумма`", parse_mode="Markdown")
+            return
+        
+        uid = parts[1]
+        amount = int(parts[2])
+        
+        if set_balance(uid, amount):
+            bot.reply_to(msg, f"✅ Баланс пользователя `{uid}` установлен на *{amount}*", parse_mode="Markdown")
+        else:
+            bot.reply_to(msg, "❌ Ошибка при установке баланса")
+    except ValueError:
+        bot.reply_to(msg, "❌ Сумма должна быть числом")
+    except Exception as e:
+        print(f"Ошибка в setbalance: {e}")
+        bot.reply_to(msg, "❌ Ошибка")
 
-    target, amount = pending_gifts.pop(uid)
 
-    if action == "no":
-        bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
+@bot.message_handler(commands=['addbalance'])
+def add_balance_cmd(msg):
+    """Добавить средства пользователю (только для админа)"""
+    if msg.from_user.username != ADMIN_USERNAME:
         return
-
-    if get_balance(uid) < amount:
-        bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)
+    
+    if not bank_db:
+        bot.reply_to(msg, "❌ Банк недоступен")
         return
+    
+    try:
+        parts = msg.text.split()
+        if len(parts) != 3:
+            bot.reply_to(msg, "Используй: `/addbalance ID сумма`", parse_mode="Markdown")
+            return
+        
+        uid = parts[1]
+        amount = int(parts[2])
+        
+        if add_balance(uid, amount):
+            new_balance = get_balance(uid)
+            bot.reply_to(msg, f"✅ Пользователю `{uid}` добавлено *{amount}*\nНовый баланс: *{new_balance}*", parse_mode="Markdown")
+        else:
+            bot.reply_to(msg, "❌ Ошибка при добавлении средств")
+    except ValueError:
+        bot.reply_to(msg, "❌ Сумма должна быть числом")
+    except Exception as e:
+        print(f"Ошибка в addbalance: {e}")
+        bot.reply_to(msg, "❌ Ошибка")
 
-    add_balance(uid, -amount)
-    add_balance(target, amount)
 
-    bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)
-    bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
-
-
-# -------- GUILD (Исправленный блок для групп) --------
+# -------- GUILD --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
     try:
@@ -378,7 +509,6 @@ def guild(msg):
         name = parts[1].strip()
         url = f"https://www.rucoyonline.com/guild/{quote(name)}"
 
-        # Добавлена проверка таймаута (5 секунд), чтобы бот не вис
         r = requests.get(url, headers=HEADERS, timeout=5)
         
         if r.status_code != 200:
@@ -395,8 +525,6 @@ def guild(msg):
         members_count = sum(1 for r in members_rows if r.find_all("td"))
 
         desc = extract_description(soup, name)
-
-        # Экранируем спецсимволы, чтобы Markdown не ломался
         desc_clean = desc.replace("```", "`\u200b``")
 
         reply = (
@@ -414,52 +542,57 @@ def guild(msg):
     except Exception as e:
         print(f"Ошибка в команде guild: {e}")
         bot.reply_to(msg, "❌ Произошла ошибка при поиске гильдии.")
-        
 
-# -------- USER (Твой оригинальный текст) --------
+
+# -------- USER --------
 @bot.message_handler(commands=['user'])
 def user(msg):
-    parts = msg.text.split(" ",1)
-    if len(parts) < 2:
-        bot.reply_to(
-            msg,
-            "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
-            parse_mode="Markdown"
+    try:
+        parts = msg.text.split(" ", 1)
+        if len(parts) < 2:
+            bot.reply_to(
+                msg,
+                "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
+                parse_mode="Markdown"
+            )
+            return
+
+        name = parts[1].strip()
+        url = f"https://www.rucoyonline.com/characters/{quote(name)}"
+
+        r = requests.get(url, headers=HEADERS, timeout=5)
+        if r.status_code != 200:
+            bot.reply_to(msg, "Игрок не найден 📛")
+            return
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        table = soup.find("table")
+        if not table:
+            bot.reply_to(msg, "Нет данных 📛")
+            return
+
+        data = {}
+        for tr in table.find_all("tr"):
+            td = tr.find_all("td")
+            if len(td) == 2:
+                data[td[0].text.strip()] = td[1].text.strip()
+
+        reply = (
+            f"👤 {data.get('Name', name)}\n"
+            f"📊 Level: {data.get('Level', '?')}\n"
+            f"⚔️ Guild: {data.get('Guild', 'None')}\n"
+            f"🟢 Last online: {data.get('Last online', '?')}\n"
+            f"📅 Born: {data.get('Born', '?')}\n"
+            f"🔗 {url}"
         )
-        return
 
-    name = parts[1].strip()
-    url = f"https://www.rucoyonline.com/characters/{quote(name)}"
+        bot.reply_to(msg, reply, disable_web_page_preview=True)
+    except Exception as e:
+        print(f"Ошибка в /user: {e}")
+        bot.reply_to(msg, "❌ Ошибка при поиске игрока")
 
-    r = requests.get(url, headers=HEADERS)
-    if r.status_code != 200:
-        bot.reply_to(msg, "Игрок не найден 📛")
-        return
 
-    soup = BeautifulSoup(r.text,"html.parser")
-    table = soup.find("table")
-    if not table:
-        bot.reply_to(msg, "Нет данных 📛")
-        return
-
-    data = {}
-    for tr in table.find_all("tr"):
-        td = tr.find_all("td")
-        if len(td)==2:
-            data[td[0].text.strip()] = td[1].text.strip()
-
-    reply = (
-        f"👤 {data.get('Name',name)}\n"
-        f"📊 Level: {data.get('Level','?')}\n"
-        f"⚔️ Guild: {data.get('Guild','None')}\n"
-        f"🟢 Last online: {data.get('Last online','?')}\n"
-        f"📅 Born: {data.get('Born','?')}\n"
-        f"🔗 {url}"
-    )
-
-    bot.reply_to(msg, reply, disable_web_page_preview=True)
-
-# -------- SCAM (Исправленный блок для групп) --------
+# -------- SCAM --------
 @bot.message_handler(commands=['skamer'])
 def add_scam(msg):
     if msg.from_user.username != ADMIN_USERNAME:
@@ -476,6 +609,7 @@ def add_scam(msg):
     except Exception as e:
         print(f"Error in skamer: {e}")
 
+
 @bot.message_handler(commands=['skam'])
 def list_scam(msg):
     try:
@@ -486,47 +620,5 @@ def list_scam(msg):
         
         txt = "🚫 *SCAM LIST*\n\n"
         for i, (k, v) in enumerate(data.items(), 1):
-            # Очищаем ник и ссылку от символов, которые ломают Markdown
             clean_name = k.replace("_", "\\_").replace("*", "")
-            clean_link = v.replace("_", "\\_")
-            txt += f"{i}. *{clean_name}*\n{clean_link}\n\n"
-            
-        # Используем обычный send_message, так как в группах reply_to может глючить при длинных списках
-        bot.send_message(msg.chat.id, txt, parse_mode="Markdown", disable_web_page_preview=True)
-    except Exception as e:
-        print(f"Error in skam list: {e}")
-        # Если Markdown все равно ломается, отправляем чистым текстом
-        bot.send_message(msg.chat.id, "❌ Ошибка отображения списка. Попробуйте позже.")
-
-@bot.message_handler(commands=['unskam'])
-def remove_scam(msg):
-    if msg.from_user.username != ADMIN_USERNAME:
-        bot.reply_to(msg, "⛔ Нет прав.")
-        return
-    try:
-        parts = msg.text.split(" ", 1)
-        if len(parts) < 2:
-            bot.reply_to(msg, "🔴 `УКАЖИ НИК`", parse_mode="Markdown")
-            return
-        name = parts[1].strip()
-        data = load_scammers()
-        if name in data:
-            del data[name]
-            save_scammers(data)
-            bot.reply_to(msg, f"🗑 *{name}* удалён из скам-листа.", parse_mode="Markdown")
-        else:
-            bot.reply_to(msg, "❌ Этот игрок не найден.")
-    except Exception as e:
-        print(f"Error in unskam: {e}")
-
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    keep_alive()
-    try:
-        bot.remove_webhook()
-        time.sleep(1)
-    except:
-        pass
-    print("Bot started")
-    bot.infinity_polling()
-        
+            c
