@@ -247,6 +247,8 @@ def gold_rates(call):
 
 # -------- BANK SYSTEM (ИСПРАВЛЕНО) --------
 
+# -------- ВАШ БЛОК BANK SYSTEM (ИСПРАВЛЕННЫЙ) --------
+
 pending_gifts = {}
 
 @bot.message_handler(commands=['bank'])
@@ -254,243 +256,108 @@ def bank_profile(msg):
     uid = str(msg.from_user.id)
     balance = get_balance(uid)
 
-    # Проверяем, что вернула функция: число или текст ошибки
     if balance == "db_error":
-        bot.reply_to(msg, "❌ **Ошибка:** Бот не смог подключиться к базе данных. Проверьте MONGO_URI и доступ по IP (0.0.0.0/0).")
-        return
-    elif balance == "query_error":
-        bot.reply_to(msg, "❌ **Ошибка:** База данных подключена, но не отвечает на запросы.")
+        bot.reply_to(msg, "❌ Ошибка: БД не подключена")
         return
 
-    # Если всё хорошо и пришло число
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
         types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
         types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
     )
-    
+    kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
+
     text = (
         "🏦 *Ваш Bank*\n\n"
         f"🆔 ID: `{uid}`\n"
         f"💰 Счёт: *{balance}*"
     )
-    bot.reply_to(msg, text, parse_mode="Markdown", reply_markup=kb)
-    
+    bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
 
-
-@bot.callback_query_handler(func=lambda c: c.data == "bank_withdraw")
-def bank_withdraw(call):
+# Обработка кнопок вывода и депозита
+@bot.callback_query_handler(func=lambda c: c.data in ["bank_withdraw", "bank_deposit", "bank_send"])
+def bank_actions(call):
     bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "📤 Для вывода напиши @herozvz:\n\n"
-        "`Я хочу вывести сумму`\n\n"
-        "Укажи свой ID и сумму.",
-        parse_mode="Markdown"
-    )
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "bank_deposit")
-def bank_deposit(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "➕ Для пополнения напиши @herozvz:\n\n"
-        "`Я хочу пополнить счёт`\n\n"
-        "Укажи свой ID и сумму.",
-        parse_mode="Markdown"
-    )
-
-
-@bot.callback_query_handler(func=lambda c: c.data == "bank_send")
-def bank_send(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        "💸 Чтобы отправить валюту:\n\n"
-        "`/gift ID сумма`\n\n"
-        "Или ответь на сообщение игрока:\n"
-        "`/gift сумма`",
-        parse_mode="Markdown"
-    )
-
+    if call.data == "bank_withdraw":
+        bot.send_message(call.message.chat.id, "📤 Для вывода напиши @herozvz")
+    elif call.data == "bank_deposit":
+        bot.send_message(call.message.chat.id, "➕ Для пополнения напиши @herozvz")
+    elif call.data == "bank_send":
+        bot.send_message(call.message.chat.id, "💸 Чтобы отправить:\n`/gift ID сумма`", parse_mode="Markdown")
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
-    """Отправить деньги другому пользователю"""
-    if not bank_db:
-        bot.reply_to(msg, "❌ Банк временно недоступен")
-        return
+    if bank_db is None: return bot.reply_to(msg, "❌ Банк недоступен")
     
+    sender = str(msg.from_user.id)
+    sender_balance = get_balance(sender)
+
+    if isinstance(sender_balance, str) or sender_balance <= 0:
+        bot.reply_to(msg, "❌ У вас нет средств")
+        return
+
     try:
-        sender = str(msg.from_user.id)
-        sender_balance = get_balance(sender)
-
-        if sender_balance <= 0:
-            bot.reply_to(msg, "❌ У вас нет средств")
-            return
-
-        # Ответом на сообщение
         if msg.reply_to_message:
             parts = msg.text.split()
-            if len(parts) != 2:
-                bot.reply_to(msg, "Используй: `/gift сумма`", parse_mode="Markdown")
-                return
+            if len(parts) != 2: return bot.reply_to(msg, "Используй: /gift сумма")
             target = str(msg.reply_to_message.from_user.id)
-            try:
-                amount = int(parts[1])
-            except ValueError:
-                bot.reply_to(msg, "❌ Сумма должна быть числом")
-                return
+            amount = int(parts[1])
         else:
             parts = msg.text.split()
-            if len(parts) != 3:
-                bot.reply_to(msg, "Используй: `/gift ID сумма`", parse_mode="Markdown")
-                return
-            target = parts[1]
-            try:
-                amount = int(parts[2])
-            except ValueError:
-                bot.reply_to(msg, "❌ Сумма должна быть числом")
-                return
+            if len(parts) != 3: return bot.reply_to(msg, "Используй: /gift ID сумма")
+            target = str(parts[1])
+            amount = int(parts[2])
 
-        if amount <= 0:
-            bot.reply_to(msg, "❌ Сумма должна быть больше 0")
-            return
-
-        if sender_balance < amount:
-            bot.reply_to(msg, "❌ Недостаточно средств")
-            return
-
-        # Нельзя отправить самому себе
-        if sender == target:
-            bot.reply_to(msg, "❌ Нельзя отправить самому себе")
-            return
+        if amount <= 0: return bot.reply_to(msg, "❌ Сумма должна быть > 0")
+        if sender_balance < amount: return bot.reply_to(msg, "❌ Недостаточно средств")
+        if sender == target: return bot.reply_to(msg, "❌ Нельзя отправить себе")
 
         pending_gifts[sender] = (target, amount)
-
         kb = types.InlineKeyboardMarkup()
         kb.add(
             types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
             types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
         )
-
-        bot.send_message(
-            msg.chat.id,
-            f"Вы уверены что хотите отправить *{amount}*?",
-            parse_mode="Markdown",
-            reply_markup=kb
-        )
-    except Exception as e:
-        print(f"Ошибка в /gift: {e}")
-        bot.reply_to(msg, "❌ Ошибка при обработке команды")
-
+        bot.send_message(msg.chat.id, f"Вы уверены, что хотите отправить *{amount}*?", parse_mode="Markdown", reply_markup=kb)
+    except:
+        bot.reply_to(msg, "❌ Ошибка в команде")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gift_"))
 def gift_confirm(call):
-    """Подтверждение перевода"""
     try:
-        action, uid = call.data.split("_", 2)[1:]
+        # Исправленный разбор данных кнопки
+        parts = call.data.split("_")
+        action = parts[1]
+        uid = parts[2]
 
         if str(call.from_user.id) != uid:
-            bot.answer_callback_query(call.id, "❌ Это не для тебя", show_alert=True)
+            bot.answer_callback_query(call.id, "❌ Это не ваша кнопка", show_alert=True)
             return
 
         if uid not in pending_gifts:
             bot.answer_callback_query(call.id, "⏳ Время вышло")
-            bot.edit_message_text("⏳ Время вышло", call.message.chat.id, call.message.message_id)
             return
 
         target, amount = pending_gifts.pop(uid)
 
         if action == "no":
             bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
-            bot.answer_callback_query(call.id)
             return
 
-        # Проверяем баланс ещё раз
+        # Финальная проверка баланса перед отправкой
         if get_balance(uid) < amount:
-            bot.edit_message_text("❌ Недостаточно средств", call.message.chat.id, call.message.message_id)
-            bot.answer_callback_query(call.id)
+            bot.edit_message_text("❌ Баланс изменился", call.message.chat.id, call.message.message_id)
             return
 
-        # Выполняем перевод
         if add_balance(uid, -amount) and add_balance(target, amount):
-            bot.edit_message_text("✅ Успешно отправлено", call.message.chat.id, call.message.message_id)
-            try:
-                bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
-            except:
-                pass  # Если не можем отправить получателю - не страшно
-            bot.answer_callback_query(call.id, "✅ Перевод выполнен")
+            bot.edit_message_text(f"✅ Успешно отправлено {amount}!", call.message.chat.id, call.message.message_id)
+            try: bot.send_message(target, f"💰 Вам переведено *{amount}*", parse_mode="Markdown")
+            except: pass
         else:
-            bot.edit_message_text("❌ Ошибка транзакции", call.message.chat.id, call.message.message_id)
-            bot.answer_callback_query(call.id, "❌ Ошибка")
+            bot.edit_message_text("❌ Ошибка базы", call.message.chat.id, call.message.message_id)
     except Exception as e:
-        print(f"Ошибка в gift_confirm: {e}")
-        bot.answer_callback_query(call.id, "❌ Ошибка")
-
-
-# Админские команды для банка
-@bot.message_handler(commands=['setbalance'])
-def set_balance_cmd(msg):
-    """Установить баланс пользователю (только для админа)"""
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
+        print(f"Ошибка gift_confirm: {e}")
     
-    if not bank_db:
-        bot.reply_to(msg, "❌ Банк недоступен")
-        return
-    
-    try:
-        parts = msg.text.split()
-        if len(parts) != 3:
-            bot.reply_to(msg, "Используй: `/setbalance ID сумма`", parse_mode="Markdown")
-            return
-        
-        uid = parts[1]
-        amount = int(parts[2])
-        
-        if set_balance(uid, amount):
-            bot.reply_to(msg, f"✅ Баланс пользователя `{uid}` установлен на *{amount}*", parse_mode="Markdown")
-        else:
-            bot.reply_to(msg, "❌ Ошибка при установке баланса")
-    except ValueError:
-        bot.reply_to(msg, "❌ Сумма должна быть числом")
-    except Exception as e:
-        print(f"Ошибка в setbalance: {e}")
-        bot.reply_to(msg, "❌ Ошибка")
-
-
-@bot.message_handler(commands=['addbalance'])
-def add_balance_cmd(msg):
-    """Добавить средства пользователю (только для админа)"""
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
-    
-    if not bank_db:
-        bot.reply_to(msg, "❌ Банк недоступен")
-        return
-    
-    try:
-        parts = msg.text.split()
-        if len(parts) != 3:
-            bot.reply_to(msg, "Используй: `/addbalance ID сумма`", parse_mode="Markdown")
-            return
-        
-        uid = parts[1]
-        amount = int(parts[2])
-        
-        if add_balance(uid, amount):
-            new_balance = get_balance(uid)
-            bot.reply_to(msg, f"✅ Пользователю `{uid}` добавлено *{amount}*\nНовый баланс: *{new_balance}*", parse_mode="Markdown")
-        else:
-            bot.reply_to(msg, "❌ Ошибка при добавлении средств")
-    except ValueError:
-        bot.reply_to(msg, "❌ Сумма должна быть числом")
-    except Exception as e:
-        print(f"Ошибка в addbalance: {e}")
-        bot.reply_to(msg, "❌ Ошибка")
-
 
 # -------- GUILD --------
 @bot.message_handler(commands=['guild'])
