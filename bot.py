@@ -11,7 +11,7 @@ from flask import Flask
 from threading import Thread
 from pymongo import MongoClient
 
----------------- CONFIG ----------------
+#---------------- CONFIG ----------------
 
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
@@ -30,7 +30,7 @@ scam_db = db["scammers"]
 
 START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
----------------- SCAM STORAGE ----------------
+#---------------- SCAM STORAGE ----------------
 
 def load_scammers():
 if os.path.exists(SCAM_FILE):
@@ -44,7 +44,7 @@ def save_scammers(data):
 with open(SCAM_FILE, "w", encoding="utf-8") as f:
 json.dump(data, f, ensure_ascii=False, indent=4)
 
----------------- RENDER KEEP ALIVE ----------------
+#---------------- RENDER KEEP ALIVE ----------------
 
 app = Flask('')
 
@@ -58,7 +58,7 @@ app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 def keep_alive():
 Thread(target=run_web_server, daemon=True).start()
 
----------------- PARSING ----------------
+#---------------- PARSING ----------------
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 MENU_WORDS = {"le navigation","rucoy online","welcome","news","highscores",
@@ -95,7 +95,7 @@ lines = remove_adjacent_duplicates(lines)
 lines = remove_repeated_block(lines)
 return "\n".join(lines) if lines else "Нет описания"
 
----------------- LOGIC FUNCTIONS ----------------
+#---------------- LOGIC FUNCTIONS ----------------
 
 def get_balance(uid):
 user_data = bank_db.find_one({"uid": str(uid)})
@@ -110,11 +110,11 @@ bank_db.update_one(
 upsert=True
 )
 
----------------- COMMANDS ----------------
+#---------------- COMMANDS ----------------
 
 pending_gifts = {}
 
----------- START ----------
+#---------- START ----------
 
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -139,7 +139,7 @@ bot.send_photo(
     reply_markup=kb  
 )
 
----------- BANK ----------
+#---------- BANK ----------
 
 @bot.callback_query_handler(func=lambda c: c.data == "bank")
 def bank_profile_callback(call):
@@ -170,7 +170,7 @@ bot.send_message(call.message.chat.id, "➕ Для пополнения напи
 elif c.data == "bank_send":
 bot.send_message(call.message.chat.id, "💸 Чтобы отправить валюту:\n/gift ID сумма\nИли ответь на сообщение игрока:\n/gift сумма", parse_mode="Markdown")
 
----------- GIFT ----------
+#---------- GIFT ----------
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
