@@ -21,26 +21,22 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
-# Настройка MongoDB с проверкой
 try:
     mongo_uri = os.getenv("MONGO_URI")
     if not mongo_uri:
-        print("⚠️ MONGO_URI не найден! Банк работать не будет.")
-        mongo = None
-        db = None
+        print("⚠️ ПЕРЕМЕННАЯ MONGO_URI НЕ ЗАДАНА В RENDER!")
         bank_db = None
     else:
-        mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-        # Проверка подключения
+        # Увеличиваем таймаут до 10 секунд
+        mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
         mongo.admin.command('ping')
         db = mongo["rucoy"]
         bank_db = db["bank"]
         print("✅ MongoDB подключена успешно")
 except Exception as e:
-    print(f"❌ Ошибка подключения к MongoDB: {e}")
-    mongo = None
-    db = None
+    print(f"❌ Ошибка подключения: {e}")
     bank_db = None
+    
 
 # Функции для работы с балансом (ИСПРАВЛЕНО)
 def get_balance(uid):
