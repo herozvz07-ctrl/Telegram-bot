@@ -1,5 +1,6 @@
 pyTelegramBotAPI
+Flask
+pymongo
+dnspython
 requests
 beautifulsoup4
-flask
-
