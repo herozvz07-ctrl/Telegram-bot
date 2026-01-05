@@ -40,16 +40,14 @@ except Exception as e:
 
 # Функции для работы с балансом (ИСПРАВЛЕНО)
 def get_balance(uid):
-    """Получить баланс пользователя"""
-    if not bank_db:
-        return 0
+    if bank_db is None: 
+        return "error" # Если база не подключилась, вернем текст ошибки
     try:
         user_data = bank_db.find_one({"uid": str(uid)})
         return user_data.get("balance", 0) if user_data else 0
-    except Exception as e:
-        print(f"Ошибка get_balance: {e}")
-        return 0
-
+    except:
+        return "error"
+        
 def add_balance(uid, amount):
     """Добавить/снять средства со счёта"""
     if not bank_db:
