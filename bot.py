@@ -358,6 +358,28 @@ def gift_confirm(call):
     except Exception as e:
         print(f"Ошибка gift_confirm: {e}")
     
+@bot.message_handler(commands=['addbalance', 'setbalance'])
+def admin_manage_bank(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        return
+    
+    parts = msg.text.split()
+    if len(parts) < 3:
+        return bot.reply_to(msg, "Используй: `/addbalance ID сумма` или `/setbalance ID сумма`")
+    
+    uid, amount = parts[1], int(parts[2])
+    
+    if msg.text.startswith('/addbalance'):
+        res = add_balance(uid, amount)
+        action = "изменен"
+    else:
+        res = set_balance(uid, amount)
+        action = "установлен"
+        
+    if res:
+        bot.reply_to(msg, f"✅ Баланс игрока `{uid}` {action}. Текущий: *{get_balance(uid)}*", parse_mode="Markdown")
+    else:
+        bot.reply_to(msg, "❌ Ошибка базы данных")
 
 # -------- GUILD --------
 @bot.message_handler(commands=['guild'])
