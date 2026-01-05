@@ -44,6 +44,12 @@ def save_scammers(data):
 with open(SCAM_FILE, "w", encoding="utf-8") as f:
 json.dump(data, f, ensure_ascii=False, indent=4)
 
+def check_scam_file():
+    if os.path.exists(SCAM_FILE):
+        print("Файл найден")
+    else:
+        print("Файл не найден")
+        
 #---------------- RENDER KEEP ALIVE ----------------
 
 app = Flask('')
