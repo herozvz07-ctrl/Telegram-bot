@@ -9,6 +9,12 @@ import telebot
 from telebot import types
 from flask import Flask
 from threading import Thread
+from pymongo import MongoClient
+
+mongo = MongoClient(os.getenv("MONGO_URI"))
+db = mongo["rucoy"]
+bank_db = db["bank"]
+scam_db = db["scammers"]
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
