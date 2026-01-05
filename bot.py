@@ -220,7 +220,75 @@ def gold_rates(call):
         parse_mode="Markdown"
     )
     bot.answer_callback_query(call.id)
-        
+
+# -------- BANK SYSTEM --------
+pending_gifts = {}
+
+@bot.message_handler(commands=['bank'])
+def bank_profile(msg):
+    uid = str(msg.from_user.id)
+    balance = get_balance(uid)
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
+           types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit"))
+    kb.add(types.InlineKeyboardButton("💸 Отправить", callback_data="bank_send"))
+    bot.send_message(msg.chat.id, f"🏦 *Ваш Bank*\n\n🆔 ID: `{uid}`\n💰 Счёт: *{balance}*", parse_mode="Markdown", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data in ["bank_withdraw", "bank_deposit"])
+def bank_actions(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "💰 По вопросам пополнения/вывода пишите @herozvz")
+
+@bot.callback_query_handler(func=lambda c: c.data == "bank_send")
+def bank_send_info(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "💸 Чтобы отправить валюту:\n`/gift ID сумма` или ответом на сообщение: `/gift сумма`", parse_mode="Markdown")
+
+@bot.message_handler(commands=['gift'])
+def gift(msg):
+    sender = str(msg.from_user.id)
+    parts = msg.text.split()
+    try:
+        if msg.reply_to_message:
+            target = str(msg.reply_to_message.from_user.id)
+            amount = int(parts[1])
+        else:
+            target = str(parts[1])
+            amount = int(parts[2])
+    except:
+        bot.reply_to(msg, "❌ Ошибка! Используй: `/gift ID сумма`", parse_mode="Markdown")
+        return
+
+    if amount <= 0 or get_balance(sender) < amount:
+        bot.reply_to(msg, "❌ Недостаточно средств или неверная сумма")
+        return
+
+    pending_gifts[sender] = (target, amount)
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"g_y_{sender}"),
+           types.InlineKeyboardButton("❌ Отмена", callback_data=f"g_n_{sender}"))
+    bot.send_message(msg.chat.id, f"Отправить {amount} игроку `{target}`?", parse_mode="Markdown", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("g_"))
+def gift_confirm(call):
+    _, action, uid = call.data.split("_")
+    if str(call.from_user.id) != uid:
+        bot.answer_callback_query(call.id, "Это не ваш перевод!", show_alert=True)
+        return
+    
+    if uid not in pending_gifts:
+        bot.edit_message_text("⌛ Время вышло", call.message.chat.id, call.message.message_id)
+        return
+
+    target, amount = pending_gifts.pop(uid)
+    if action == "y" and get_balance(uid) >= amount:
+        add_balance(uid, -amount)
+        add_balance(target, amount)
+        bot.edit_message_text(f"✅ Успешно отправлено {amount}", call.message.chat.id, call.message.message_id)
+    else:
+        bot.edit_message_text("❌ Отменено", call.message.chat.id, call.message.message_id)
+
+
 # -------- GUILD (Исправленный блок для групп) --------
 @bot.message_handler(commands=['guild'])
 def guild(msg):
