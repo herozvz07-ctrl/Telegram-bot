@@ -19,7 +19,7 @@ ADMIN_USERNAME = "herozvz"
 SCAM_FILE = "scammers.json"
 
 if not TOKEN or not MONGO_URI:
-raise ValueError("BOT_TOKEN или MONGO_URI не найдены! Проверь переменные окружения Render.")
+    raise ValueError("BOT_TOKEN или MONGO_URI не найдены! Проверь переменные окружения Render.")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
