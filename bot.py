@@ -100,7 +100,7 @@ def extract_description(soup, name):
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(types.InlineKeyboardButton("📘 Rucoy Wiki", url="https://t.me/rucoy_wiki"))
+    kb.add(types.InlineKeyboardButton("➕ Добавить в группу", url="https://t.me/rucoy_online_robot?startgroup=interface"))
     kb.add(
         types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
         types.InlineKeyboardButton("🛒 Rucoy Market", url="https://t.me/Bancus_Rucoy/4")
@@ -124,7 +124,7 @@ def send_start(message):
 def gold_command(message):
     try:
         text = (
-            "💰 *Покупка Gold*\n\n"
+            "💰 *Курс Gold на данный момент*\n\n"
 
             "🇷🇺 *Россия (RUB)*\n"
             "`20₽ = 1kk Gold`\n\n"
@@ -187,7 +187,7 @@ def buy_gold_menu(call):
     try:
         bot.send_message(
             call.message.chat.id,
-            "💰 Покупка Gold\n\n 🇷🇺 Россия (RUB)\n > 20₽ = 1kk Gold\n\n 🇺🇦 Украина (UAH)\n > 11₴ = 1kk Gold\n\n 🇰🇿 Казахстан (KZT)\n > 130₸ = 1kk Gold\n\n 🇧🇾 Беларусь (BYN)\n > 0.8 BYN = 1kk Gold\n\n 🇺🇸 Доллар (USD)\n > $0.3 = 1kk Gold",
+            "💰 курс Gold на данный момент\n\n 🇷🇺 Россия (RUB)\n > 20₽ = 1kk Gold\n\n 🇺🇦 Украина (UAH)\n > 11₴ = 1kk Gold\n\n 🇰🇿 Казахстан (KZT)\n > 130₸ = 1kk Gold\n\n 🇧🇾 Беларусь (BYN)\n > 0.8 BYN = 1kk Gold\n\n 🇺🇸 Доллар (USD)\n > $0.3 = 1kk Gold",
             parse_mode="Markdown",
             reply_markup=kb
         )
