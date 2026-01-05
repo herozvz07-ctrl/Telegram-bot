@@ -21,20 +21,25 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
+# --- Настройка подключения к БД ---
 try:
     mongo_uri = os.getenv("MONGO_URI")
     if not mongo_uri:
-        print("⚠️ ПЕРЕМЕННАЯ MONGO_URI НЕ ЗАДАНА В RENDER!")
+        print("⚠️ Переменная MONGO_URI не задана!")
         bank_db = None
     else:
-        # Увеличиваем таймаут до 10 секунд
-        mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+        # Подключаемся с таймаутом 15 секунд
+        mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=15000)
+        
+        # Проверяем доступ (ping)
         mongo.admin.command('ping')
+        
+        # Выбираем базу 'rucoy' и таблицу 'bank'
         db = mongo["rucoy"]
         bank_db = db["bank"]
-        print("✅ MongoDB подключена успешно")
+        print("✅ ПОДКЛЮЧЕНО: База данных rucoy готова к работе!")
 except Exception as e:
-    print(f"❌ Ошибка подключения: {e}")
+    print(f"❌ ОШИБКА ПОДКЛЮЧЕНИЯ: {e}")
     bank_db = None
     
 
