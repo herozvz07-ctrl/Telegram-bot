@@ -257,37 +257,27 @@ def gold_rates(call):
 
 # -------- BANK SYSTEM (ИСПРАВЛЕНО) --------
 
-# -------- BANK SYSTEM (ПОЛНОЕ ОБНОВЛЕНИЕ) --------
+# -------- ИСПРАВЛЕННАЯ СИСТЕМА БАНКА И ПЕРЕВОДОВ --------
 
-last_transfer_time = {}  # Для антиспама
-transfer_process = {}    # Для пошагового ввода суммы
-
-def get_player_name(uid):
-    """Пытается достать имя игрока из базы"""
-    if not bank_db: return "Unknown"
-    user_data = bank_db.find_one({"uid": str(uid)})
-    if user_data and "name" in user_data:
-        return user_data["name"]
-    return f"Player {uid}"
+user_states = {} # Храним данные о переводе: {user_id: {'target_id': 123, 'step': 'amount'}}
 
 @bot.message_handler(commands=['bank'])
 def bank_profile(msg):
-    # Берем ID того, кто отправил команду
     uid = str(msg.from_user.id)
-    name = msg.from_user.first_name or "Player"
+    # Если это колбэк (нажатие кнопки), достаем ник правильно
+    name = msg.from_user.first_name if msg.from_user.first_name else "Player"
     
-    # ПРОВЕРКА НА БАН
+    # Проверка на бан
     user_data = bank_db.find_one({"uid": uid}) if bank_db is not None else None
     if user_data and user_data.get("banned", False):
         return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
 
-    # Обновляем имя в базе
     if bank_db is not None:
         bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
     
     balance = get_balance(uid)
-    if balance == "db_error":
-        return bot.reply_to(msg, "❌ Ошибка базы данных")
+    if balance in ["db_error", "query_error"]:
+        return bot.reply_to(msg, "❌ Ошибка базы данных.")
 
     kb = types.InlineKeyboardMarkup(row_width=2)
     url_deposit = f"https://t.me/herozvz?text=Я%20хочу%20пополнить%20счёт%20(ID:%20{uid})"
@@ -307,27 +297,16 @@ def bank_profile(msg):
     )
     bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
 
-# ИСПРАВЛЕННЫЙ обработчик кнопки "Мой Банк"
-@bot.callback_query_handler(func=lambda c: c.data == "open_bank")
-def open_bank_callback(call):
-    bot.answer_callback_query(call.id)
-    # ВАЖНО: передаем call.from_user (того кто нажал), а не сообщение админа
-    bank_profile(call) 
-    
-    
-
-# --- ЛОГИКА ПЕРЕВОДА (GIFT) ---
-
 @bot.message_handler(commands=['gift'])
 def gift_init(msg):
     uid = str(msg.from_user.id)
     
-    # Антиспам 2 минуты (120 секунд)
+    # Антиспам (2 минуты)
     now = datetime.datetime.now()
     if uid in last_transfer_time:
         diff = (now - last_transfer_time[uid]).total_seconds()
         if diff < 120:
-            return bot.reply_to(msg, f"⏳ Анти-спам! Подождите {int(120 - diff)} сек.")
+            return bot.reply_to(msg, f"⏳ Подождите {int(120 - diff)} сек.")
 
     parts = msg.text.split()
     target_id = None
@@ -337,107 +316,83 @@ def gift_init(msg):
     elif len(parts) > 1:
         target_id = parts[1]
     else:
-        return bot.reply_to(msg, "📝 Чтобы перевести: `/gift ID` или ответь на сообщение.", parse_mode="Markdown")
+        return bot.reply_to(msg, "📝 Чтобы перевести:\n`/gift ID` или ответь на сообщение игрока этой командой.", parse_mode="Markdown")
 
     if target_id == uid:
         return bot.reply_to(msg, "❌ Нельзя переводить самому себе.")
 
     target_name = get_player_name(target_id)
-    transfer_process[uid] = {'target_id': target_id, 'target_name': target_name}
+    # Запоминаем, что этот юзер начал перевод
+    user_states[uid] = {'target_id': target_id, 'target_name': target_name, 'action': 'waiting_gift_amount'}
     
-    sent = bot.reply_to(msg, f"💰 Перевод для: *{target_name}*\n🆔 ID: `{target_id}`\n\n*Введите сумму перевода (минимум 25,000):*", parse_mode="Markdown")
-    bot.register_next_step_handler(sent, gift_get_amount)
+    bot.reply_to(msg, f"💰 Перевод для: *{target_name}*\n🆔 ID: `{target_id}`\n\n*Введите сумму (минимум 25,000):*", parse_mode="Markdown")
 
-def gift_get_amount(msg):
+# Общий обработчик текста для ввода сумм (чтобы не зависало)
+@bot.message_handler(func=lambda msg: str(msg.from_user.id) in user_states)
+def handle_text_states(msg):
     uid = str(msg.from_user.id)
-    if uid not in transfer_process: return
+    state = user_states[uid]
 
-    try:
-        # Убираем пробелы и запятые, если юзер их ввел
-        amount_str = msg.text.replace(" ", "").replace(",", "")
-        amount = int(amount_str)
-        
-        if amount < 25000:
-            return bot.reply_to(msg, "❌ Минимальная сумма перевода: 25,000 gold.")
-        
-        balance = get_balance(uid)
-        if balance < amount:
-            return bot.reply_to(msg, f"❌ Недостаточно средств. Ваш баланс: {balance:,}")
+    if state.get('action') == 'waiting_gift_amount':
+        try:
+            amount_str = msg.text.replace(" ", "").replace(",", "")
+            amount = int(amount_str)
+            
+            if amount < 25000:
+                return bot.reply_to(msg, "❌ Минимальная сумма: 25,000.")
+            
+            balance = get_balance(uid)
+            if balance < amount:
+                return bot.reply_to(msg, f"❌ Недостаточно средств. Ваш баланс: {balance:,}")
 
-        data = transfer_process[uid]
-        data['amount'] = amount
+            state['amount'] = amount
+            state['action'] = 'confirm' # Меняем статус на ожидание подтверждения
 
-        kb = types.InlineKeyboardMarkup()
-        kb.add(
-            types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"gconfirm_yes_{uid}"),
-            types.InlineKeyboardButton("❌ Отмена", callback_data=f"gconfirm_no_{uid}")
-        )
-
-        bot.send_message(msg.chat.id, f"❓ Вы уверены, что хотите отправить *{amount:,}* gold игроку *{data['target_name']}*?", 
-                         parse_mode="Markdown", reply_markup=kb)
-    except ValueError:
-        bot.reply_to(msg, "❌ Ошибка! Введите сумму только цифрами.")
+            kb = types.InlineKeyboardMarkup()
+            kb.add(
+                types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"gconfirm_yes_{uid}"),
+                types.InlineKeyboardButton("❌ Отмена", callback_data=f"gconfirm_no_{uid}")
+            )
+            bot.send_message(msg.chat.id, f"❓ Отправить *{amount:,}* gold игроку *{state['target_name']}*?", 
+                             parse_mode="Markdown", reply_markup=kb)
+        except ValueError:
+            bot.reply_to(msg, "❌ Введите сумму цифрами.")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gconfirm_"))
 def gift_final_stage(call):
-    _, action, uid = call.data.split("_")
-    if str(call.from_user.id) != uid:
+    _, action, owner_id = call.data.split("_")
+    
+    # Только тот, кто начал перевод, может нажать кнопку
+    if str(call.from_user.id) != owner_id:
         return bot.answer_callback_query(call.id, "❌ Это не ваш перевод!", show_alert=True)
 
-    if uid not in transfer_process:
-        return bot.edit_message_text("❌ Время ожидания истекло.", call.message.chat.id, call.message.message_id)
+    if owner_id not in user_states:
+        return bot.edit_message_text("❌ Сессия истекла.", call.message.chat.id, call.message.message_id)
 
-    data = transfer_process.pop(uid)
+    data = user_states.pop(owner_id) # Удаляем состояние сразу после нажатия
+    
     if action == "no":
         return bot.edit_message_text("❌ Перевод отменен.", call.message.chat.id, call.message.message_id)
 
     amount = data['amount']
     target = data['target_id']
     
-    if add_balance(uid, -amount) and add_balance(target, amount):
-        last_transfer_time[uid] = datetime.datetime.now()
+    if add_balance(owner_id, -amount) and add_balance(target, amount):
+        last_transfer_time[owner_id] = datetime.datetime.now()
         
-        # Формируем данные для чека
         now = datetime.datetime.utcnow()
-        time_str = now.strftime("%H:%M")
-        date_str = now.strftime("%d%m%Y")
-        # Формат: Время!Получатель!Отправитель!Дата!Сумма
-        check_raw = f"{time_str}!{target}!{uid}!{date_str}!{amount}"
+        check_raw = f"{now.strftime('%H:%M')}!{target}!{owner_id}!{now.strftime('%d%m%Y')}!{amount}"
         
         kb = types.InlineKeyboardMarkup()
         kb.add(types.InlineKeyboardButton("📄 Посмотреть чек", callback_data=f"vcheck_{check_raw}"))
         
-        bot.edit_message_text(f"✅ Перевод доставлен успешно!\nСохраните это сообщение и чек.", 
+        bot.edit_message_text(f"✅ Перевод {amount:,} gold успешно выполнен!", 
                               call.message.chat.id, call.message.message_id, reply_markup=kb)
-        
         try:
             bot.send_message(target, f"💰 Вам пришел перевод: *{amount:,}* gold!\nПроверьте `/bank`.", parse_mode="Markdown")
         except: pass
     else:
-        bot.edit_message_text("❌ Ошибка транзакции. Свяжитесь с админом.", call.message.chat.id, call.message.message_id)
-
-# --- ВСплывающее ОКНО ЧЕКА ---
-@bot.callback_query_handler(func=lambda c: c.data.startswith("vcheck_"))
-def show_popup_check(call):
-    raw = call.data.replace("vcheck_", "")
-    p = raw.split("!") # 0:время, 1:target, 2:sender, 3:дата, 4:сумма
-    
-    # Только отправитель или админ herozvz может смотреть чек
-    if str(call.from_user.id) != p[2] and call.from_user.username != ADMIN_USERNAME:
-        return bot.answer_callback_query(call.id, "❌ Доступ к чеку только у отправителя!", show_alert=True)
-
-    # Формируем текст как вы просили
-    # перевод✅: 16:30!676767!7676767!6012026!800000
-    check_text = f"перевод✅: {p[0]}!{p[1]}!{p[2]}!{p[3]}!{p[4]}"
-    
-    bot.answer_callback_query(call.id, text=check_text, show_alert=True)
-
-@bot.callback_query_handler(func=lambda c: c.data == "start_gift_btn")
-def gift_btn_handler(call):
-    bot.answer_callback_query(call.id)
-    bot.send_message(call.message.chat.id, "Чтобы отправить золото, используй:\n`/gift ID` или ответь на сообщение игрока.", parse_mode="Markdown")
-
-# --- КОНЕЦ БЛОКА BANK SYSTEM ---
+        bot.send_message(call.message.chat.id, "❌ Ошибка транзакции.")
 
 # -------- GUILD --------
 @bot.message_handler(commands=['guild'])
