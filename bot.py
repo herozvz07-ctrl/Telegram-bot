@@ -1,4 +1,4 @@
-import os
+э́import os
 import re
 import time
 import json
@@ -287,40 +287,68 @@ def bank_actions(call):
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
-    if bank_db is None: return bot.reply_to(msg, "❌ Банк недоступен")
+    if bank_db is None: 
+        return bot.reply_to(msg, "❌ Банк недоступен")
     
     sender = str(msg.from_user.id)
-    sender_balance = get_balance(sender)
-
-    if isinstance(sender_balance, str) or sender_balance <= 0:
-        bot.reply_to(msg, "❌ У вас нет средств")
-        return
-
+    
     try:
+        parts = msg.text.split()
+        
+        # 1. Определяем цель (target) и сумму (amount)
         if msg.reply_to_message:
-            parts = msg.text.split()
-            if len(parts) != 2: return bot.reply_to(msg, "Используй: /gift сумма")
+            # Если это ответ на сообщение в чате
+            if len(parts) < 2:
+                return bot.reply_to(msg, "📝 Используй: `/gift [сумма]` (ответом на сообщение)", parse_mode="Markdown")
+            
             target = str(msg.reply_to_message.from_user.id)
-            amount = int(parts[1])
+            try:
+                amount = int(parts[1])
+            except ValueError:
+                return bot.reply_to(msg, "❌ Сумма должна быть числом")
         else:
-            parts = msg.text.split()
-            if len(parts) != 3: return bot.reply_to(msg, "Используй: /gift ID сумма")
+            # Если это через ID
+            if len(parts) < 3:
+                return bot.reply_to(msg, "📝 Используй: `/gift [ID] [сумма]`", parse_mode="Markdown")
+            
             target = str(parts[1])
-            amount = int(parts[2])
+            try:
+                amount = int(parts[2])
+            except ValueError:
+                return bot.reply_to(msg, "❌ Сумма должна быть числом")
 
-        if amount <= 0: return bot.reply_to(msg, "❌ Сумма должна быть > 0")
-        if sender_balance < amount: return bot.reply_to(msg, "❌ Недостаточно средств")
-        if sender == target: return bot.reply_to(msg, "❌ Нельзя отправить себе")
+        # 2. Базовые проверки
+        if amount <= 0:
+            return bot.reply_to(msg, "❌ Сумма должна быть больше 0")
+        
+        if sender == target:
+            return bot.reply_to(msg, "❌ Нельзя переводить самому себе")
 
+        # 3. Проверка баланса (важно привести к числу)
+        sender_balance = get_balance(sender)
+        if isinstance(sender_balance, str) or int(sender_balance) < amount:
+            return bot.reply_to(msg, "❌ Недостаточно средств на балансе")
+
+        # 4. Сохраняем в ожидание
         pending_gifts[sender] = (target, amount)
+        
         kb = types.InlineKeyboardMarkup()
         kb.add(
-            types.InlineKeyboardButton("✅ Да", callback_data=f"gift_yes_{sender}"),
-            types.InlineKeyboardButton("❌ Нет", callback_data=f"gift_no_{sender}")
+            types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"gift_yes_{sender}"),
+            types.InlineKeyboardButton("❌ Отмена", callback_data=f"gift_no_{sender}")
         )
-        bot.send_message(msg.chat.id, f"Вы уверены, что хотите отправить *{amount}*?", parse_mode="Markdown", reply_markup=kb)
-    except:
-        bot.reply_to(msg, "❌ Ошибка в команде")
+        
+        bot.send_message(
+            msg.chat.id, 
+            f"🎁 *Перевод средств*\n\nОтправитель: `{sender}`\nПолучатель: `{target}`\nСумма: *{amount}*\n\nВы подтверждаете перевод?",
+            parse_mode="Markdown",
+            reply_markup=kb
+        )
+
+    except Exception as e:
+        print(f"Ошибка в /gift: {e}")
+        bot.reply_to(msg, f"❌ Произошла ошибка при обработке команды в чате.")
+        
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("gift_"))
 def gift_confirm(call):
