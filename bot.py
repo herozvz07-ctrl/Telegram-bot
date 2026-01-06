@@ -275,6 +275,13 @@ def bank_profile(msg):
     uid = str(msg.from_user.id)
     name = msg.from_user.first_name or "Player"
     
+    # ПРОВЕРКА НА БАН
+    user_data = bank_db.find_one({"uid": uid}) if bank_db is not None else None
+    if user_data and user_data.get("banned", False):
+        return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
+    
+    # ... дальше весь остальной код функции bank_profile ...
+    
     # Сохраняем ник
     if bank_db is not None:
         try:
@@ -572,6 +579,7 @@ admin_states = {}
 
 @bot.message_handler(commands=['admin'])
 def admin_panel(msg):
+    # Проверка: только ты (herozvz) можешь открыть панель
     if msg.from_user.username != ADMIN_USERNAME:
         return
 
@@ -613,7 +621,8 @@ def admin_get_id(msg):
     action = admin_states[uid]["action"]
     
     if action == "ban":
-        # Логика бана
+        if bank_db is None: return bot.send_message(msg.chat.id, "❌ База недоступна")
+        
         user_data = bank_db.find_one({"uid": target_id})
         is_banned = user_data.get("banned", False) if user_data else False
         
@@ -648,34 +657,23 @@ def admin_get_amount(msg):
 
         bot.send_message(msg.chat.id, res_text, parse_mode="Markdown")
         
-        # Уведомление игроку
+        # Уведомление игроку (если он когда-то писал боту в ЛС)
         try:
-            bot.send_message(target_id, f"🔔 Ваш баланс был изменен администратором.\nТекущий счет: *{get_balance(target_id):,}*", parse_mode="Markdown")
+            current_bal = get_balance(target_id)
+            bot.send_message(target_id, f"🔔 Ваш баланс изменен администратором.\nТекущий счет: *{current_bal:,}*", parse_mode="Markdown")
         except: pass
 
     except:
-        bot.send_message(msg.chat.id, "❌ Ошибка! Нужно ввести число.")
+        bot.send_message(msg.chat.id, "❌ Ошибка! Введите число.")
     
     if uid in admin_states: del admin_states[uid]
 
-# -------- ПРОВЕРКА БАНА В КОМАНДАХ --------
-
-# Добавь это в начало функции bank_profile и gift_init:
-"""
-user_data = bank_db.find_one({"uid": uid})
-if user_data and user_data.get("banned", False):
-    return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
-"""
-
-
-# ----------------HeroDolbayop не трогай тут ничего----------------
+# -------- ЗАПУСК БОТА --------
 
 if __name__ == "__main__":
-    # 1. Запускаем веб-сервер для Render (чтобы не засыпал)
     keep_alive()
+    print("✅ Бот запускается...")
+    # Сброс вебхука перед поллингом помогает избежать ошибки 409
+    bot.remove_webhook()
+    bot.polling(none_stop=True, interval=0, timeout=20)
     
-    # 2. Запускаем самого бота
-    print("✅ Бот запущен и готов к работе!")
-    bot.polling(none_stop=True)
-    
-      
