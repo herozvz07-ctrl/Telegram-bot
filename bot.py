@@ -250,8 +250,6 @@ def gold_rates(call):
 
 # -------- BANK SYSTEM (ПОЛНОЕ ОБНОВЛЕНИЕ) --------
 
-import datetime
-
 last_transfer_time = {}  # Для антиспама
 transfer_process = {}    # Для пошагового ввода суммы
 
@@ -268,13 +266,20 @@ def bank_profile(msg):
     uid = str(msg.from_user.id)
     name = msg.from_user.first_name or "Player"
     
-    # Обновляем ник в базе при каждом заходе
-    if bank_db:
-        bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
+    # ИСПРАВЛЕНО: Проверка на None вместо прямого условия
+    if bank_db is not None:
+        try:
+            bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
+        except Exception as e:
+            print(f"Ошибка сохранения имени: {e}")
     
     balance = get_balance(uid)
+    
+    # ИСПРАВЛЕНО: Обработка ошибок баланса
     if balance == "db_error":
-        return bot.reply_to(msg, "❌ Ошибка подключения к базе данных")
+        return bot.reply_to(msg, "❌ Ошибка: База данных не подключена.")
+    if balance == "query_error":
+        return bot.reply_to(msg, "❌ Ошибка запроса к балансу.")
 
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
@@ -290,6 +295,7 @@ def bank_profile(msg):
         f"💰 Баланс: *{balance:,}* gold"
     )
     bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+    
 
 # --- ЛОГИКА ПЕРЕВОДА (GIFT) ---
 
