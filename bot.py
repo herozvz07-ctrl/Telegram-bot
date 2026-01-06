@@ -20,7 +20,7 @@ admin_states = {}    # uid -> {action, target_id}
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_USERNAME = "herozvz"
+ADMIN_ID = 6395348885  # ← ЗАМЕНИ НА СВОЙ TELEGRAM ID (узнать можно через @userinfobot)
 SCAM_FILE = "scammers.json"
 
 if not TOKEN:
@@ -35,13 +35,8 @@ try:
         print("⚠️ Переменная MONGO_URI не задана!")
         bank_db = None
     else:
-        # Подключаемся с таймаутом 15 секунд
         mongo = MongoClient(mongo_uri, serverSelectionTimeoutMS=15000)
-        
-        # Проверяем доступ (ping)
         mongo.admin.command('ping')
-        
-        # Выбираем базу 'rucoy' и таблицу 'bank'
         db = mongo["rucoy"]
         bank_db = db["bank"]
         print("✅ ПОДКЛЮЧЕНО: База данных rucoy готова к работе!")
@@ -226,7 +221,12 @@ def send_start(message):
 @bot.callback_query_handler(func=lambda c: c.data == "open_bank")
 def open_bank_callback(call):
     bot.answer_callback_query(call.id)
-    bank_profile(call.message)
+    # Отправляем в личку
+    try:
+        bot.send_message(call.from_user.id, "Открываю ваш банк...")
+        bank_profile_direct(call.from_user.id)
+    except:
+        bot.answer_callback_query(call.id, "❌ Напишите боту в личку: /bank", show_alert=True)
 
 @bot.message_handler(commands=['gold'])
 def gold_command(message):
@@ -290,23 +290,29 @@ def gold_rates(call):
     )
     bot.answer_callback_query(call.id)
 
-# -------- BANK SYSTEM --------
+# -------- BANK SYSTEM (ИСПРАВЛЕНО) --------
 
-@bot.message_handler(commands=['bank'])
-def bank_profile(msg):
-    uid = str(msg.from_user.id)
-    name = msg.from_user.first_name if msg.from_user.first_name else "Player"
+def bank_profile_direct(user_id):
+    """Отправка профиля банка напрямую по user_id"""
+    uid = str(user_id)
+    
+    # Получаем имя пользователя
+    try:
+        user = bot.get_chat(user_id)
+        name = user.first_name if user.first_name else "Player"
+    except:
+        name = "Player"
     
     # Проверка на бан
     if is_banned(uid):
-        return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
+        return bot.send_message(user_id, "🚫 Вы заблокированы в банковской системе.")
 
     if bank_db is not None:
         bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
     
     balance = get_balance(uid)
     if balance in ["db_error", "query_error"]:
-        return bot.reply_to(msg, "❌ Ошибка базы данных.")
+        return bot.send_message(user_id, "❌ Ошибка базы данных.")
 
     kb = types.InlineKeyboardMarkup(row_width=2)
     url_deposit = f"https://t.me/herozvz?text=Я%20хочу%20пополнить%20счёт%20(ID:%20{uid})"
@@ -324,7 +330,15 @@ def bank_profile(msg):
         f"🆔 ID: `{uid}`\n"
         f"💰 Баланс: *{balance:,}* gold"
     )
-    bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+    bot.send_message(user_id, text, parse_mode="Markdown", reply_markup=kb)
+
+@bot.message_handler(commands=['bank'])
+def bank_profile(msg):
+    # Работает ТОЛЬКО в личке
+    if msg.chat.type != 'private':
+        return bot.reply_to(msg, "⚠️ Эта команда работает только в личных сообщениях с ботом.")
+    
+    bank_profile_direct(msg.from_user.id)
 
 @bot.callback_query_handler(func=lambda c: c.data == "start_gift_btn")
 def start_gift_from_button(call):
@@ -333,20 +347,24 @@ def start_gift_from_button(call):
     
     # Проверка на бан
     if is_banned(uid):
-        return bot.send_message(call.message.chat.id, "🚫 Вы заблокированы в банковской системе.")
+        return bot.send_message(call.from_user.id, "🚫 Вы заблокированы в банковской системе.")
     
     # Антиспам (2 минуты)
     now = datetime.datetime.now()
     if uid in last_transfer:
         diff = (now - last_transfer[uid]).total_seconds()
         if diff < 120:
-            return bot.send_message(call.message.chat.id, f"⏳ Подождите {int(120 - diff)} сек.")
+            return bot.send_message(call.from_user.id, f"⏳ Подождите {int(120 - diff)} сек.")
     
     user_states[uid] = {'action': 'waiting_target_id'}
-    bot.send_message(call.message.chat.id, "🆔 *Введите ID получателя:*", parse_mode="Markdown")
+    bot.send_message(call.from_user.id, "🆔 *Введите ID получателя:*", parse_mode="Markdown")
 
 @bot.message_handler(commands=['gift'])
 def gift_init(msg):
+    # Работает ТОЛЬКО в личке
+    if msg.chat.type != 'private':
+        return bot.reply_to(msg, "⚠️ Эта команда работает только в личных сообщениях с ботом.")
+    
     uid = str(msg.from_user.id)
     
     # Проверка на бан
@@ -368,7 +386,9 @@ def gift_init(msg):
     elif len(parts) > 1:
         target_id = parts[1]
     else:
-        return bot.reply_to(msg, "📝 Чтобы перевести:\n`/gift ID` или ответь на сообщение игрока этой командой.", parse_mode="Markdown")
+        # Переходим в режим ввода ID
+        user_states[uid] = {'action': 'waiting_target_id'}
+        return bot.reply_to(msg, "🆔 *Введите ID получателя:*", parse_mode="Markdown")
 
     if target_id == uid:
         return bot.reply_to(msg, "❌ Нельзя переводить самому себе.")
@@ -382,11 +402,14 @@ def gift_init(msg):
     
     bot.reply_to(msg, f"💰 Перевод для: *{target_name}*\n🆔 ID: `{target_id}`\n\n*Введите сумму (минимум 25,000):*", parse_mode="Markdown")
 
-# Обработчик текстовых состояний
-@bot.message_handler(func=lambda msg: str(msg.from_user.id) in user_states)
+# Обработчик текстовых состояний (ИСПРАВЛЕНО)
+@bot.message_handler(func=lambda msg: msg.chat.type == 'private' and str(msg.from_user.id) in user_states and not msg.text.startswith('/'))
 def handle_text_states(msg):
     uid = str(msg.from_user.id)
-    state = user_states[uid]
+    state = user_states.get(uid)
+    
+    if not state:
+        return
 
     # Ввод ID получателя
     if state.get('action') == 'waiting_target_id':
@@ -413,7 +436,10 @@ def handle_text_states(msg):
                 return bot.reply_to(msg, "❌ Минимальная сумма: 25,000.")
             
             balance = get_balance(uid)
-            if balance in ["db_error", "query_error"] or balance < amount:
+            if balance in ["db_error", "query_error"]:
+                return bot.reply_to(msg, "❌ Ошибка базы данных.")
+            
+            if balance < amount:
                 return bot.reply_to(msg, f"❌ Недостаточно средств. Ваш баланс: {balance:,}")
 
             state['amount'] = amount
@@ -425,7 +451,7 @@ def handle_text_states(msg):
                 types.InlineKeyboardButton("❌ Отмена", callback_data=f"gconfirm_no_{uid}")
             )
             bot.send_message(msg.chat.id, 
-                           f"❓ Отправить *{amount:,}* gold игроку *{state['target_name']}*?", 
+                           f"❓ Отправить *{amount:,}* gold игроку *{state['target_name']}* (ID: `{state['target_id']}`)?\n\nВаш баланс после перевода: *{balance - amount:,}* gold", 
                            parse_mode="Markdown", reply_markup=kb)
         except ValueError:
             bot.reply_to(msg, "❌ Введите сумму цифрами.")
@@ -450,19 +476,25 @@ def gift_final_stage(call):
     amount = data['amount']
     target = data['target_id']
     
+    # Проверяем баланс еще раз перед переводом
+    balance = get_balance(owner_id)
+    if balance in ["db_error", "query_error"] or balance < amount:
+        return bot.edit_message_text(f"❌ Ошибка: недостаточно средств.", 
+                                     call.message.chat.id, call.message.message_id)
+    
     if add_balance(owner_id, -amount) and add_balance(target, amount):
         last_transfer[owner_id] = datetime.datetime.now()
         
-        bot.edit_message_text(f"✅ Перевод {amount:,} gold успешно выполнен!", 
-                              call.message.chat.id, call.message.message_id)
+        bot.edit_message_text(f"✅ Перевод {amount:,} gold успешно выполнен!\n\nПолучатель: {data['target_name']} (ID: `{target}`)", 
+                              call.message.chat.id, call.message.message_id, parse_mode="Markdown")
         try:
             bot.send_message(target, 
-                           f"💰 Вам пришел перевод: *{amount:,}* gold от игрока ID: `{owner_id}`\nПроверьте `/bank`.", 
+                           f"💰 Вам пришел перевод: *{amount:,}* gold от игрока ID: `{owner_id}`\n\nПроверьте `/bank`", 
                            parse_mode="Markdown")
         except: 
             pass
     else:
-        bot.send_message(call.message.chat.id, "❌ Ошибка транзакции.")
+        bot.send_message(call.message.chat.id, "❌ Ошибка транзакции. Обратитесь к администратору.")
 
 # -------- GUILD --------
 @bot.message_handler(commands=['guild'])
@@ -550,48 +582,4 @@ def user(msg):
         reply = (
             f"👤 {data.get('Name', name)}\n"
             f"📊 Level: {data.get('Level', '?')}\n"
-            f"⚔️ Guild: {data.get('Guild', 'None')}\n"
-            f"🟢 Last online: {data.get('Last online', '?')}\n"
-            f"📅 Born: {data.get('Born', '?')}\n"
-            f"🔗 {url}"
-        )
-
-        bot.reply_to(msg, reply, disable_web_page_preview=True)
-    except Exception as e:
-        print(f"Ошибка в /user: {e}")
-        bot.reply_to(msg, "❌ Ошибка при поиске игрока")
-
-# -------- SCAM --------
-@bot.message_handler(commands=['skamer'])
-def add_scam(msg):
-    if msg.from_user.username != ADMIN_USERNAME:
-        return
-    try:
-        parts = msg.text.split(maxsplit=2)
-        if len(parts) < 3:
-            bot.reply_to(msg, "Используй: `/skamer Nick link`", parse_mode="Markdown")
-            return
-        data = load_scammers()
-        data[parts[1]] = parts[2]
-        save_scammers(data)
-        bot.reply_to(msg, "✅ Добавлено")
-    except Exception as e:
-        print(f"Error in skamer: {e}")
-
-@bot.message_handler(commands=['skam'])
-def list_scam(msg):
-    try:
-        data = load_scammers()
-        if not data:
-            bot.reply_to(msg, "🛡️ Список пуст")
-            return
-        
-        txt = "🚫 *SCAM LIST*\n\n"
-        for i, (k, v) in enumerate(data.items(), 1):
-            clean_name = k.replace("_", "\\_").replace("*", "")
-            txt += f"{i}. {clean_name}: [Ссылка]({v})\n"
-            
-        bot.reply_to(msg, txt, parse_mode="Markdown", disable_web_page_preview=True)
-    except Exception as e:
-        print(f"Ошибка в /skam: {e}")
-        bot.rep
+            f"⚔️ Guild: {data.get('
