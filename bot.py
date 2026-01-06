@@ -579,7 +579,6 @@ admin_states = {}
 
 @bot.message_handler(commands=['admin'])
 def admin_panel(msg):
-    # Проверка: только ты (herozvz) можешь открыть панель
     if msg.from_user.username != ADMIN_USERNAME:
         return
 
@@ -657,7 +656,6 @@ def admin_get_amount(msg):
 
         bot.send_message(msg.chat.id, res_text, parse_mode="Markdown")
         
-        # Уведомление игроку (если он когда-то писал боту в ЛС)
         try:
             current_bal = get_balance(target_id)
             bot.send_message(target_id, f"🔔 Ваш баланс изменен администратором.\nТекущий счет: *{current_bal:,}*", parse_mode="Markdown")
@@ -668,12 +666,25 @@ def admin_get_amount(msg):
     
     if uid in admin_states: del admin_states[uid]
 
-# -------- ЗАПУСК БОТА --------
+# --- ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ КНОПОК ---
+
+@bot.callback_query_handler(func=lambda c: True)
+def global_callbacks(call):
+    if call.data == "open_bank":
+        bot.answer_callback_query(call.id)
+        bank_profile(call.message)
+    elif call.data == "start_gift_btn":
+        bot.answer_callback_query(call.id)
+        bot.send_message(call.message.chat.id, "Чтобы отправить золото, используй:\n`/gift ID` или ответь на сообщение игрока.", parse_mode="Markdown")
+
+# -------- ЗАПУСК --------
 
 if __name__ == "__main__":
     keep_alive()
     print("✅ Бот запускается...")
-    # Сброс вебхука перед поллингом помогает избежать ошибки 409
+    # Обязательно удаляем вебхук перед поллингом
     bot.remove_webhook()
+    # Запуск бота
     bot.polling(none_stop=True, interval=0, timeout=20)
-    
+        
+
