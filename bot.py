@@ -272,6 +272,7 @@ def get_player_name(uid):
 
 @bot.message_handler(commands=['bank'])
 def bank_profile(msg):
+    # Берем ID того, кто отправил команду
     uid = str(msg.from_user.id)
     name = msg.from_user.first_name or "Player"
     
@@ -279,24 +280,18 @@ def bank_profile(msg):
     user_data = bank_db.find_one({"uid": uid}) if bank_db is not None else None
     if user_data and user_data.get("banned", False):
         return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
-    
-    # ... дальше весь остальной код функции bank_profile ...
-    
-    # Сохраняем ник
+
+    # Обновляем имя в базе
     if bank_db is not None:
-        try:
-            bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
-        except: pass
+        bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
     
     balance = get_balance(uid)
     if balance == "db_error":
         return bot.reply_to(msg, "❌ Ошибка базы данных")
 
     kb = types.InlineKeyboardMarkup(row_width=2)
-    
-    # Кнопки-ссылки (сразу открывают чат с тобой)
-    url_deposit = f"https://t.me/herozvz?text=Я%20хочу%20пополнить%20счёт%20(Мой%20ID:%20{uid})"
-    url_withdraw = f"https://t.me/herozvz?text=Я%20хочу%20вывести%20сумму%20(Мой%20ID:%20{uid})"
+    url_deposit = f"https://t.me/herozvz?text=Я%20хочу%20пополнить%20счёт%20(ID:%20{uid})"
+    url_withdraw = f"https://t.me/herozvz?text=Я%20хочу%20вывести%20gold%20(ID:%20{uid})"
     
     kb.add(
         types.InlineKeyboardButton("➕ Пополнить", url=url_deposit),
@@ -311,6 +306,13 @@ def bank_profile(msg):
         f"💰 Баланс: *{balance:,}* gold"
     )
     bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+
+# ИСПРАВЛЕННЫЙ обработчик кнопки "Мой Банк"
+@bot.callback_query_handler(func=lambda c: c.data == "open_bank")
+def open_bank_callback(call):
+    bot.answer_callback_query(call.id)
+    # ВАЖНО: передаем call.from_user (того кто нажал), а не сообщение админа
+    bank_profile(call) 
     
     
 
