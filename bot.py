@@ -1,5 +1,4 @@
 import os
-import datetime
 import re
 import time
 import json
@@ -11,6 +10,10 @@ from telebot import types
 from flask import Flask
 from threading import Thread
 from pymongo import MongoClient
+from datetime import datetime, timedelta
+
+transfer_states = {}   # uid -> {target, amount, msg_id}
+last_transfer = {}     # антиспам
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
