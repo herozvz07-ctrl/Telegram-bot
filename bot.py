@@ -546,17 +546,12 @@ def guild(msg):
         print(f"Ошибка в команде guild: {e}")
         bot.reply_to(msg, "❌ Произошла ошибка при поиске гильдии.")
 
-# -------- USER --------
+# -------- ПРОДОЛЖЕНИЕ ФУНКЦИИ USER (ИСПРАВЛЕНО) --------
 @bot.message_handler(commands=['user'])
 def user(msg):
     parts = msg.text.split(" ", 1)
     if len(parts) < 2:
-        bot.reply_to(
-            msg,
-            "🔴 `УКАЖИ НИК ИГРОКА`\n\nПример:\n`/user Hero Of Titan`",
-            parse_mode="Markdown"
-        )
-        return
+        return bot.reply_to(msg, "🔴 `УКАЖИ НИК ИГРОКА`", parse_mode="Markdown")
 
     name = parts[1].strip()
     url = f"https://www.rucoyonline.com/characters/{quote(name)}"
@@ -564,14 +559,12 @@ def user(msg):
     try:
         r = requests.get(url, headers=HEADERS, timeout=5)
         if r.status_code != 200:
-            bot.reply_to(msg, "Игрок не найден 📛")
-            return
+            return bot.reply_to(msg, "Игрок не найден 📛")
 
         soup = BeautifulSoup(r.text, "html.parser")
         table = soup.find("table")
         if not table:
-            bot.reply_to(msg, "Нет данных 📛")
-            return
+            return bot.reply_to(msg, "Нет данных 📛")
 
         data = {}
         for tr in table.find_all("tr"):
@@ -582,4 +575,76 @@ def user(msg):
         reply = (
             f"👤 {data.get('Name', name)}\n"
             f"📊 Level: {data.get('Level', '?')}\n"
-            f"⚔️ Guild: {data.get('
+            f"⚔️ Guild: {data.get('Guild', 'None')}\n"
+            f"🟢 Last online: {data.get('Last online', '?')}\n"
+            f"📅 Born: {data.get('Born', '?')}\n"
+            f"🔗 {url}"
+        )
+        bot.reply_to(msg, reply, disable_web_page_preview=True)
+    except Exception as e:
+        bot.reply_to(msg, "❌ Ошибка при поиске игрока")
+
+# -------- ADMIN PANEL (ПО ID) --------
+
+@bot.message_handler(commands=['admin'])
+def admin_panel(msg):
+    # Проверка по твоему ID
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("➕ Добавить Gold", callback_data="adm_add"),
+        types.InlineKeyboardButton("➖ Снять Gold", callback_data="adm_sub")
+    )
+    kb.add(
+        types.InlineKeyboardButton("⚙️ Установить баланс", callback_data="adm_set"),
+        types.InlineKeyboardButton("🚫 Бан/Разбан", callback_data="adm_ban")
+    )
+    bot.send_message(msg.chat.id, "🛠 **Панель администратора**", parse_mode="Markdown", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("adm_"))
+def admin_callback(call):
+    if call.from_user.id != ADMIN_ID:
+        return bot.answer_callback_query(call.id, "Доступ запрещен!")
+
+    action = call.data.split("_")[1]
+    admin_states[call.from_user.id] = {"action": action}
+    
+    bot.edit_message_text(f"📝 Действие: {action}. Введите **ID игрока**:", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+
+# Обработка ввода для админа (ID и Сумма)
+@bot.message_handler(func=lambda msg: msg.from_user.id == ADMIN_ID and msg.from_user.id in admin_states)
+def handle_admin_text(msg):
+    aid = msg.from_user.id
+    state = admin_states[aid]
+    
+    if "target_id" not in state:
+        state["target_id"] = msg.text.strip()
+        if state["action"] == "ban":
+            res = ban_user(state["target_id"], not is_banned(state["target_id"]))
+            bot.send_message(msg.chat.id, f"✅ Статус бана изменен для `{state['target_id']}`")
+            admin_states.pop(aid)
+        else:
+            bot.send_message(msg.chat.id, "💰 Введите сумму:")
+    else:
+        try:
+            amount = int(msg.text.replace(" ", ""))
+            target = state["target_id"]
+            if state["action"] == "add": add_balance(target, amount)
+            elif state["action"] == "sub": add_balance(target, -amount)
+            elif state["action"] == "set": set_balance(target, amount)
+            
+            bot.send_message(msg.chat.id, f"✅ Успешно выполнено для {target}")
+            admin_states.pop(aid)
+        except:
+            bot.send_message(msg.chat.id, "❌ Ошибка! Введите число.")
+
+# -------- ЗАПУСК БОТА --------
+
+if __name__ == "__main__":
+    keep_alive()
+    print("✅ Бот успешно запущен!")
+    bot.remove_webhook()
+    bot.polling(none_stop=True, interval=0, timeout=20)
+    
