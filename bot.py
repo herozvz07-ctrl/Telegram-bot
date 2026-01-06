@@ -266,25 +266,25 @@ def bank_profile(msg):
     uid = str(msg.from_user.id)
     name = msg.from_user.first_name or "Player"
     
-    # ИСПРАВЛЕНО: Проверка на None вместо прямого условия
+    # Сохраняем ник
     if bank_db is not None:
         try:
             bank_db.update_one({"uid": uid}, {"$set": {"name": name}}, upsert=True)
-        except Exception as e:
-            print(f"Ошибка сохранения имени: {e}")
+        except: pass
     
     balance = get_balance(uid)
-    
-    # ИСПРАВЛЕНО: Обработка ошибок баланса
     if balance == "db_error":
-        return bot.reply_to(msg, "❌ Ошибка: База данных не подключена.")
-    if balance == "query_error":
-        return bot.reply_to(msg, "❌ Ошибка запроса к балансу.")
+        return bot.reply_to(msg, "❌ Ошибка базы данных")
 
     kb = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Кнопки-ссылки (сразу открывают чат с тобой)
+    url_deposit = f"https://t.me/herozvz?text=Я%20хочу%20пополнить%20счёт%20(Мой%20ID:%20{uid})"
+    url_withdraw = f"https://t.me/herozvz?text=Я%20хочу%20вывести%20сумму%20(Мой%20ID:%20{uid})"
+    
     kb.add(
-        types.InlineKeyboardButton("📤 Вывод", callback_data="bank_withdraw"),
-        types.InlineKeyboardButton("➕ Пополнить", callback_data="bank_deposit")
+        types.InlineKeyboardButton("➕ Пополнить", url=url_deposit),
+        types.InlineKeyboardButton("📤 Вывод", url=url_withdraw)
     )
     kb.add(types.InlineKeyboardButton("💸 Отправить Gold", callback_data="start_gift_btn"))
     
@@ -295,6 +295,7 @@ def bank_profile(msg):
         f"💰 Баланс: *{balance:,}* gold"
     )
     bot.send_message(msg.chat.id, text, parse_mode="Markdown", reply_markup=kb)
+    
     
 
 # --- ЛОГИКА ПЕРЕВОДА (GIFT) ---
