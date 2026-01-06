@@ -565,6 +565,109 @@ def list_scam(msg):
         print(f"Ошибка в /skam: {e}")
         bot.reply_to(msg, "❌ Не удалось загрузить список")
 
+# -------- ADMIN PANEL SYSTEM --------
+
+# Временное хранилище для шагов админа
+admin_states = {} 
+
+@bot.message_handler(commands=['admin'])
+def admin_panel(msg):
+    if msg.from_user.username != ADMIN_USERNAME:
+        return
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("➕ Добавить Gold", callback_data="adm_add"),
+        types.InlineKeyboardButton("➖ Снять Gold", callback_data="adm_sub")
+    )
+    kb.add(
+        types.InlineKeyboardButton("⚙️ Установить баланс", callback_data="adm_set"),
+        types.InlineKeyboardButton("🚫 Бан/Разбан", callback_data="adm_ban")
+    )
+    
+    bot.send_message(msg.chat.id, "🛠 **Панель администратора**\nВыберите действие:", parse_mode="Markdown", reply_markup=kb)
+
+# Обработка нажатий в админ-панели
+@bot.callback_query_handler(func=lambda c: c.data.startswith("adm_"))
+def admin_callback(call):
+    if call.from_user.username != ADMIN_USERNAME:
+        return bot.answer_callback_query(call.id, "У вас нет прав!")
+
+    action = call.data.split("_")[1]
+    admin_states[call.from_user.id] = {"action": action}
+
+    if action == "ban":
+        sent = bot.edit_message_text("🚫 Введите **ID** игрока для бана/разбана:", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+    else:
+        sent = bot.edit_message_text("🆔 Введите **ID** игрока:", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+    
+    bot.register_next_step_handler(sent, admin_get_id)
+
+def admin_get_id(msg):
+    uid = msg.from_user.id
+    if uid not in admin_states: return
+
+    target_id = msg.text.strip()
+    admin_states[uid]["target_id"] = target_id
+
+    action = admin_states[uid]["action"]
+    
+    if action == "ban":
+        # Логика бана
+        user_data = bank_db.find_one({"uid": target_id})
+        is_banned = user_data.get("banned", False) if user_data else False
+        
+        new_status = not is_banned
+        bank_db.update_one({"uid": target_id}, {"$set": {"banned": new_status}}, upsert=True)
+        
+        status_text = "🚫 ЗАБАНЕН" if new_status else "✅ РАЗБАНЕН"
+        bot.send_message(msg.chat.id, f"Игрок `{target_id}` теперь {status_text}", parse_mode="Markdown")
+        del admin_states[uid]
+    else:
+        sent = bot.send_message(msg.chat.id, "💰 Теперь введите **сумму**:")
+        bot.register_next_step_handler(sent, admin_get_amount)
+
+def admin_get_amount(msg):
+    uid = msg.from_user.id
+    if uid not in admin_states: return
+
+    try:
+        amount = int(msg.text.replace(" ", "").replace(",", ""))
+        target_id = admin_states[uid]["target_id"]
+        action = admin_states[uid]["action"]
+
+        if action == "add":
+            add_balance(target_id, amount)
+            res_text = f"✅ Добавлено {amount:,} gold игроку `{target_id}`"
+        elif action == "sub":
+            add_balance(target_id, -amount)
+            res_text = f"✅ Снято {amount:,} gold у игрока `{target_id}`"
+        elif action == "set":
+            set_balance(target_id, amount)
+            res_text = f"✅ Баланс игрока `{target_id}` установлен на {amount:,}"
+
+        bot.send_message(msg.chat.id, res_text, parse_mode="Markdown")
+        
+        # Уведомление игроку
+        try:
+            bot.send_message(target_id, f"🔔 Ваш баланс был изменен администратором.\nТекущий счет: *{get_balance(target_id):,}*", parse_mode="Markdown")
+        except: pass
+
+    except:
+        bot.send_message(msg.chat.id, "❌ Ошибка! Нужно ввести число.")
+    
+    if uid in admin_states: del admin_states[uid]
+
+# -------- ПРОВЕРКА БАНА В КОМАНДАХ --------
+
+# Добавь это в начало функции bank_profile и gift_init:
+"""
+user_data = bank_db.find_one({"uid": uid})
+if user_data and user_data.get("banned", False):
+    return bot.reply_to(msg, "🚫 Вы заблокированы в банковской системе.")
+"""
+
+
 # ----------------HeroDolbayop не трогай тут ничего----------------
 
 if __name__ == "__main__":
