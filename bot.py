@@ -164,6 +164,9 @@ def extract_description(soup, name):
 @bot.message_handler(commands=['start'])
 def send_start(message):
     kb = types.InlineKeyboardMarkup(row_width=2)
+    # Новая кнопка Банк
+    kb.add(types.InlineKeyboardButton("🏦 Мой Банк", callback_data="open_bank"))
+    
     kb.add(types.InlineKeyboardButton("➕ Добавить в группу", url="https://t.me/rucoy_online_robot?startgroup=interface"))
     kb.add(
         types.InlineKeyboardButton("💬 Rucoy Chat", url="https://t.me/Bancus_Rucoy/13"),
@@ -183,6 +186,12 @@ def send_start(message):
         parse_mode="Markdown",
         reply_markup=kb
     )
+
+# Обработчик для кнопки Банк из меню старт
+@bot.callback_query_handler(func=lambda c: c.data == "open_bank")
+def open_bank_callback(call):
+    bot.answer_callback_query(call.id)
+    bank_profile(call.message) # Вызываем функцию профиля
 
 @bot.message_handler(commands=['gold'])
 def gold_command(message):
