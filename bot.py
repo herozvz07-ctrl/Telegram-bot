@@ -644,7 +644,15 @@ def handle_admin_text(msg):
 
 if __name__ == "__main__":
     keep_alive()
-    print("✅ Бот успешно запущен!")
-    bot.remove_webhook()
-    bot.polling(none_stop=True, interval=0, timeout=20)
+    print("✅ Бот запускается...")
     
+    # Пытаемся запустить бота с защитой от вылетов
+    while True:
+        try:
+            bot.remove_webhook()
+            print("✅ Вебхук удален, начинаю опрос (polling)...")
+            bot.polling(none_stop=True, interval=0, timeout=60)
+        except Exception as e:
+            print(f"❌ Ошибка подключения: {e}")
+            time.sleep(5)  # Ждем 5 секунд перед повторной попыткой
+            
