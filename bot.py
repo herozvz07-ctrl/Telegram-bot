@@ -167,40 +167,53 @@ def api_search():
             return jsonify({"error": "Не найдено на Rucoy Online"}), 404
 
         # ... (начало то же самое)
-        soup = BeautifulSoup(r.text, "html.parser")
+       soup = BeautifulSoup(r.text, "html.parser")
         
         if stype == "guild":
-            members_rows = soup.find_all("tr")
-            # Проверяем, что в строке есть данные (td), чтобы не считать заголовки
-            members_count = sum(1 for r in members_rows if r.find_all("td"))
-            
+            # 1. Ищем информацию о клане (Описание и Дата создания)
+            info_table = soup.find("table")  # Первая таблица на странице клана
+            clan_info = {}
+            if info_table:
+                for tr in info_table.find_all("tr"):
+                    tds = tr.find_all("td")
+                    if len(tds) == 2:
+                        key = tds[0].text.strip().lower()
+                        val = tds[1].text.strip()
+                        clan_info[key] = val
+
+            # 2. Считаем участников (вторая таблица)
+            all_tables = soup.find_all("table")
+            members_count = 0
+            if len(all_tables) > 1:
+                # Считаем строки во второй таблице, исключая заголовок
+                members_count = len(all_tables[1].find_all("tr")) - 1
+
             return jsonify({
                 "name": name, 
                 "type": "guild", 
-                "members": members_count, # Ключ должен быть "members"
+                "members": members_count,
+                "description": clan_info.get("description", "Нет описания"),
+                "created_at": clan_info.get("created", "Неизвестно"),
                 "url": url
             })
             
-            return jsonify({
-                "name": name,
-                "type": "guild",
-                "members_count": len(members),
-                "top_members": members[:5], # Отдаем первых 5 игроков
-                "url": url
-            })
         else:
+            # ПОИСК ИГРОКА
             table = soup.find("table")
+            if not table:
+                return jsonify({"error": "Player not found"}), 404
+                
             data = {}
             for tr in table.find_all("tr"):
                 td = tr.find_all("td")
                 if len(td) == 2:
+                    # Сохраняем ключи в нижнем регистре для надежности
                     data[td[0].text.strip()] = td[1].text.strip()
             
-            # Добавим "вкусности":
             return jsonify({
                 "name": data.get('Name', name),
                 "level": data.get('Level', 'N/A'),
-                "exp": data.get('Experience', 'Hidden'), # Опыт
+                "exp": data.get('Experience', 'Hidden'),
                 "guild": data.get('Guild', 'None'),
                 "online": data.get('Last online', 'Unknown'),
                 "born": data.get('Born', 'Unknown'),
@@ -210,8 +223,7 @@ def api_search():
 
     except Exception as e:
         print(f"Ошибка API: {e}")
-        return jsonify({"error": f"Internal error: {str(e)}"}), 500
-
+        return jsonify({"error": "Internal error"}), 500
 # ---------------- PARSING ----------------
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
