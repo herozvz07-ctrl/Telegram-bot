@@ -148,7 +148,7 @@ def home():
 @app.route('/api/search')
 def api_search():
     try:
-        name = request.args.get('name')
+        nickname = request.args.get('nickname').lower()
         stype = request.args.get('type')
         
         if not name:
