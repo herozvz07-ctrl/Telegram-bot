@@ -18,6 +18,7 @@ transfer_states = {}
 last_transfer = {}  # uid -> datetime последнего перевода
 user_states = {}     # uid -> {target_id, action, amount}
 admin_states = {}    # uid -> {action, target_id}
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # ---------------- Конфигурация ----------------
 TOKEN = os.getenv("BOT_TOKEN")
@@ -123,8 +124,6 @@ START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
 
 #------------------------------------------------
 # Перенеси это в самый верх после импортов!
-HEADERS = {"User-Agent": "Mozilla/5.0"}
-
 @app.route('/api/search')
 def api_search():
     try:
