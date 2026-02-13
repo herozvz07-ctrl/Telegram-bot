@@ -207,62 +207,7 @@ def run_web_server():
 
 def keep_alive():
     Thread(target=run_web_server, daemon=True).start()
-
-# Разрешаем сайту обращаться к боту
-CORS(app)
-
-@app.route('/api/search')
-def api_search():
-    name = request.args.get('name')
-    stype = request.args.get('type') # 'player' или 'guild'
     
-    if not name:
-        return jsonify({"error": "Введите имя"}), 400
-
-    try:
-        if stype == "guild":
-            url = f"https://www.rucoyonline.com/guild/{quote(name)}"
-            r = requests.get(url, headers=HEADERS, timeout=5)
-            if r.status_code != 200:
-                return jsonify({"error": "Гильдия не найдена"}), 404
-            
-            soup = BeautifulSoup(r.text, "html.parser")
-            members_rows = soup.find_all("tr")
-            members_count = sum(1 for r in members_rows if r.find_all("td"))
-            
-            return jsonify({
-                "name": name,
-                "type": "guild",
-                "members": members_count,
-                "url": url
-            })
-        else:
-            url = f"https://www.rucoyonline.com/characters/{quote(name)}"
-            r = requests.get(url, headers=HEADERS, timeout=5)
-            if r.status_code != 200:
-                return jsonify({"error": "Игрок не найден"}), 404
-            
-            soup = BeautifulSoup(r.text, "html.parser")
-            table = soup.find("table")
-            if not table:
-                return jsonify({"error": "Нет данных"}), 404
-
-            data = {}
-            for tr in table.find_all("tr"):
-                td = tr.find_all("td")
-                if len(td) == 2:
-                    data[td[0].text.strip()] = td[1].text.strip()
-            
-            return jsonify({
-                "name": data.get('Name', name),
-                "level": data.get('Level', '?'),
-                "guild": data.get('Guild', 'None'),
-                "online": data.get('Last online', '?'),
-                "type": "player",
-                "url": url
-            })
-    except Exception as e:
-        return jsonify({"error": "Ошибка парсинга"}), 500
 # ---------------- PARSING ----------------
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
