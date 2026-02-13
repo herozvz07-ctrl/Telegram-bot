@@ -137,21 +137,14 @@ def save_scammers(data):
     with open(SCAM_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# ---------------- RENDER KEEP ALIVE ----------------
+# ---------------- RENDER & API SETTINGS ----------------
 app = Flask('')
+CORS(app)  # <--- ДОБАВЬ ЭТУ СТРОКУ! Без неё сайт не сможет делать запросы к боту.
 
 @app.route('/')
 def home():
     return "Bot is alive!"
 
-def run_web_server():
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-def keep_alive():
-    Thread(target=run_web_server, daemon=True).start()
-
-#------------------------------------------------
-# Перенеси это в самый верх после импортов!
 @app.route('/api/search')
 def api_search():
     try:
@@ -161,7 +154,6 @@ def api_search():
         if not name:
             return jsonify({"error": "Введите имя"}), 400
 
-        # Используем quote прямо здесь
         safe_name = quote(name)
 
         if stype == "guild":
@@ -204,9 +196,9 @@ def api_search():
             })
 
     except Exception as e:
-        print(f"Ошибка API: {e}") # Это появится в логах Render
+        print(f"Ошибка API: {e}")
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
-    
+
 # ---------------- PARSING ----------------
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
