@@ -167,7 +167,7 @@ def api_search():
             return jsonify({"error": "Не найдено на Rucoy Online"}), 404
 
         # ... (начало то же самое)
-       soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(r.text, "html.parser")
         
         if stype == "guild":
             # 1. Ищем информацию о клане (Описание и Дата создания)
