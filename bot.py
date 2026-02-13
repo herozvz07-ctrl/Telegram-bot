@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 import telebot
 from telebot import types
-from flask import Flask
+from flask import Flask, request, jsonify
 from threading import Thread
 from pymongo import MongoClient
 from flask_cors import CORS  
