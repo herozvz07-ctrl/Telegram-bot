@@ -148,32 +148,78 @@ def home():
 @app.route('/api/search')
 def api_search():
     try:
-        # 1. Получаем имя и тип
+        # 1. Получаем данные
         name_raw = request.args.get('name', '').strip()
         stype = request.args.get('type', 'player')
 
         if not name_raw:
             return jsonify({"error": "Введите имя!"}), 400
 
-        # 2. ФОРМИРУЕМ ССЫЛКУ (как в оригинале)
-        # Для Rucoy важно: пробелы должны стать %20
+        # 2. Формируем URL (заменяем пробелы на %20)
         name_for_url = name_raw.replace(" ", "%20")
-        
         if stype == "guild":
             url = f"https://www.rucoyonline.com/guild/{name_for_url}"
         else:
             url = f"https://www.rucoyonline.com/player/{name_for_url}"
 
-        # 3. Делаем запрос
-        r = requests.get(url, timeout=10)
+        # 3. Настройка заголовков (чтобы сайт не забанил бота)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        # 4. Делаем запрос
+        r = requests.get(url, headers=headers, timeout=10)
         
-        # Если Rucoy вернул 404, значит такого игрока/клана нет
         if r.status_code == 404:
-            return jsonify({"error": f"{'Клан' if stype == 'guild' else 'Игрок'} не найден"}), 404
+            return jsonify({"error": "Ничего не найдено на Rucoy Online"}), 404
 
         soup = BeautifulSoup(r.text, "html.parser")
         
-        # ... дальше твой код парсинга (tables для клана, table для игрока)
+        if stype == "guild":
+            # Парсинг Клана
+            tables = soup.find_all("table")
+            if not tables:
+                return jsonify({"error": "Данные клана не найдены"}), 404
+            
+            clan_info = {}
+            for tr in tables[0].find_all("tr"):
+                tds = tr.find_all("td")
+                if len(tds) == 2:
+                    clan_info[tds[0].text.strip().lower()] = tds[1].text.strip()
+            
+            m_count = len(tables[1].find_all("tr")) - 1 if len(tables) > 1 else 0
+
+            return jsonify({
+                "name": name_raw.title(),
+                "type": "guild",
+                "members": m_count,
+                "description": clan_info.get("description", "Нет описания"),
+                "created_at": clan_info.get("created", "Неизвестно"),
+                "url": url
+            })
+        else:
+            # Парсинг Игрока
+            table = soup.find("table")
+            if not table:
+                return jsonify({"error": "Персонаж не найден"}), 404
+            
+            p_data = {tr.find_all("td")[0].text.strip(): tr.find_all("td")[1].text.strip() 
+                      for tr in table.find_all("tr") if len(tr.find_all("td")) == 2}
+
+            return jsonify({
+                "name": p_data.get('Name', name_raw),
+                "level": p_data.get('Level', 'N/A'),
+                "guild": p_data.get('Guild', 'None'),
+                "online": p_data.get('Last online', 'Unknown'),
+                "born": p_data.get('Born', 'Unknown'),
+                "type": "player",
+                "url": url
+            })
+
+    except Exception as e:
+        # ОБЯЗАТЕЛЬНЫЙ БЛОК EXCEPT (его отсутствие вызывало ошибку)
+        print(f"Ошибка поиска: {e}")
+        return jsonify({"error": f"Ошибка сервера: {str(e)}"}), 500
         
 # ---------------- PARSING ----------------
 HEADERS = {
