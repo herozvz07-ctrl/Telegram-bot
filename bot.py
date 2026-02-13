@@ -121,63 +121,6 @@ def is_banned(uid):
 
 # Ссылка на баннер для меню /start
 START_BANNER = "https://i.ibb.co/5X2W2c8q/e9a3f45d2f734f9126820cdca7b55266.jpg"
-
-#------------------------------------------------
-# Перенеси это в самый верх после импортов!
-@app.route('/api/search')
-def api_search():
-    try:
-        name = request.args.get('name')
-        stype = request.args.get('type')
-        
-        if not name:
-            return jsonify({"error": "Введите имя"}), 400
-
-        # Используем quote прямо здесь
-        safe_name = quote(name)
-
-        if stype == "guild":
-            url = f"https://www.rucoyonline.com/guild/{safe_name}"
-        else:
-            url = f"https://www.rucoyonline.com/characters/{safe_name}"
-
-        r = requests.get(url, headers=HEADERS, timeout=5)
-        
-        if r.status_code != 200:
-            return jsonify({"error": "Не найдено на Rucoy Online"}), 404
-
-        soup = BeautifulSoup(r.text, "html.parser")
-        
-        if stype == "guild":
-            members_rows = soup.find_all("tr")
-            members_count = sum(1 for r in members_rows if r.find_all("td"))
-            return jsonify({
-                "name": name, "type": "guild", 
-                "members": members_count, "url": url
-            })
-        else:
-            table = soup.find("table")
-            if not table:
-                return jsonify({"error": "Данные персонажа скрыты или отсутствуют"}), 404
-            
-            data = {}
-            for tr in table.find_all("tr"):
-                td = tr.find_all("td")
-                if len(td) == 2:
-                    data[td[0].text.strip()] = td[1].text.strip()
-            
-            return jsonify({
-                "name": data.get('Name', name),
-                "level": data.get('Level', '?'),
-                "guild": data.get('Guild', 'None'),
-                "online": data.get('Last online', '?'),
-                "type": "player",
-                "url": url
-            })
-
-    except Exception as e:
-        print(f"Ошибка API: {e}") # Это появится в логах Render
-        return jsonify({"error": f"Internal error: {str(e)}"}), 500
 # ---------------- SCAM STORAGE ----------------
 def load_scammers():
     try:
