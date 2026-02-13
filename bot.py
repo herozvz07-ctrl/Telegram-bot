@@ -170,13 +170,16 @@ def api_search():
         soup = BeautifulSoup(r.text, "html.parser")
         
         if stype == "guild":
-            # Ищем не только количество, но и список лидеров (первых 3)
-            rows = soup.find_all("tr")
-            members = []
-            for tr in rows[1:]: # Пропускаем заголовок
-                tds = tr.find_all("td")
-                if len(tds) > 0:
-                    members.append(tds[0].text.strip())
+            members_rows = soup.find_all("tr")
+            # Проверяем, что в строке есть данные (td), чтобы не считать заголовки
+            members_count = sum(1 for r in members_rows if r.find_all("td"))
+            
+            return jsonify({
+                "name": name, 
+                "type": "guild", 
+                "members": members_count, # Ключ должен быть "members"
+                "url": url
+            })
             
             return jsonify({
                 "name": name,
