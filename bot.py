@@ -690,19 +690,26 @@ def handle_admin_text(msg):
         except:
             bot.send_message(msg.chat.id, "❌ Ошибка! Введите число.")
 
-# -------- ЗАПУСК БОТА --------
+# -------- ЗАПУСК БОТА И API --------
 
 if __name__ == "__main__":
-    keep_alive()
-    print("✅ Бот запускается...")
+    # Запускаем Flask в отдельном потоке (Thread)
+    # Мы используем лямбда-функцию, чтобы запустить app.run без создания лишних функций
+    flask_thread = Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000))))
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    print("✅ Flask API запущен на порту", os.environ.get("PORT", 10000))
+    print("✅ Бот начинает опрос (polling)...")
     
     # Пытаемся запустить бота с защитой от вылетов
     while True:
         try:
+            # Убираем вебхуки, чтобы избежать конфликтов
             bot.remove_webhook()
-            print("✅ Вебхук удален, начинаю опрос (polling)...")
-            bot.polling(none_stop=True, interval=0, timeout=60)
+            # Запускаем бесконечный опрос
+            bot.polling(none_stop=True, interval=1, timeout=20)
         except Exception as e:
-            print(f"❌ Ошибка подключения: {e}")
-            time.sleep(5)  # Ждем 5 секунд перед повторной попыткой
-            
+            print(f"❌ Ошибка подключения бота: {e}")
+            # Ждем 10 секунд, если Telegram нас временно ограничил
+            time.sleep(10)
