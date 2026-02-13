@@ -148,67 +148,32 @@ def home():
 @app.route('/api/search')
 def api_search():
     try:
-        # Получаем данные из запроса
-        name = request.args.get('name', '').strip().replace(' ', '+').lower()
+        # 1. Получаем имя и тип
+        name_raw = request.args.get('name', '').strip()
         stype = request.args.get('type', 'player')
 
-        if not name:
+        if not name_raw:
             return jsonify({"error": "Введите имя!"}), 400
 
-        # Формируем ссылку
-        base_url = "https://www.rucoyonline.com/guild/" if stype == "guild" else "https://www.rucoyonline.com/player/"
-        url = base_url + name
-
-        # Запрос к Rucoy
-        r = requests.get(url, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
+        # 2. ФОРМИРУЕМ ССЫЛКУ (как в оригинале)
+        # Для Rucoy важно: пробелы должны стать %20
+        name_for_url = name_raw.replace(" ", "%20")
         
         if stype == "guild":
-            # Парсим клан
-            tables = soup.find_all("table")
-            if not tables:
-                return jsonify({"error": "Клан не найден"}), 404
-            
-            # Инфо о клане (первая таблица)
-            info = {}
-            for tr in tables[0].find_all("tr"):
-                tds = tr.find_all("td")
-                if len(tds) == 2:
-                    info[tds[0].text.strip().lower()] = tds[1].text.strip()
-            
-            # Считаем участников (вторая таблица)
-            m_count = len(tables[1].find_all("tr")) - 1 if len(tables) > 1 else 0
-
-            return jsonify({
-                "name": name.replace('+', ' ').title(),
-                "type": "guild",
-                "members": m_count,
-                "description": info.get("description", "Нет описания"),
-                "created_at": info.get("created", "Неизвестно"),
-                "url": url
-            })
+            url = f"https://www.rucoyonline.com/guild/{name_for_url}"
         else:
-            # Парсим игрока
-            table = soup.find("table")
-            if not table:
-                return jsonify({"error": "Игрок не найден"}), 404
-            
-            p_data = {tr.find_all("td")[0].text.strip(): tr.find_all("td")[1].text.strip() 
-                      for tr in table.find_all("tr") if len(tr.find_all("td")) == 2}
+            url = f"https://www.rucoyonline.com/player/{name_for_url}"
 
-            return jsonify({
-                "name": p_data.get('Name', name),
-                "level": p_data.get('Level', 'N/A'),
-                "guild": p_data.get('Guild', 'None'),
-                "online": p_data.get('Last online', 'Unknown'),
-                "born": p_data.get('Born', 'Unknown'),
-                "type": "player",
-                "url": url
-            })
+        # 3. Делаем запрос
+        r = requests.get(url, timeout=10)
+        
+        # Если Rucoy вернул 404, значит такого игрока/клана нет
+        if r.status_code == 404:
+            return jsonify({"error": f"{'Клан' if stype == 'guild' else 'Игрок'} не найден"}), 404
 
-    except Exception as e:
-        print(f"🔥 ОШИБКА: {e}")
-        return jsonify({"error": str(e)}), 500
+        soup = BeautifulSoup(r.text, "html.parser")
+        
+        # ... дальше твой код парсинга (tables для клана, table для игрока)
         
 # ---------------- PARSING ----------------
 HEADERS = {
