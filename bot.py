@@ -145,55 +145,56 @@ CORS(app)  # <--- ДОБАВЬ ЭТУ СТРОКУ! Без неё сайт не 
 def home():
     return "Bot is alive!"
 
-@app.route('/api/search')
+@app.route('/api/search', methods=['GET'])
 def api_search():
-    try:
-        name = request.args.get('name')
-        stype = request.args.get('type')
-        
-        if not name:
-            return jsonify({"error": "Введите имя"}), 400
+    name = request.args.get('name', '').strip()
+    stype = request.args.get('type', 'player')
 
-        safe_name = quote(name)
+    if not name:
+        return jsonify({"error": "Введите имя"}), 400
 
-        if stype == "guild":
-            url = f"https://www.rucoyonline.com/guild/{safe_name}"
-        else:
-            url = f"https://www.rucoyonline.com/characters/{safe_name}"
+    safe_name = quote(name)
 
-        r = requests.get(url, headers=HEADERS, timeout=5)
-        
-        if r.status_code != 200:
-            return jsonify({"error": "Не найдено на Rucoy Online"}), 404
+    url = (
+        f"https://www.rucoyonline.com/guild/{safe_name}"
+        if stype == "guild"
+        else f"https://www.rucoyonline.com/characters/{safe_name}"
+    )
 
-        soup = BeautifulSoup(r.text, "html.parser")
-        
-        if stype == "guild":
-            members_rows = soup.find_all("tr")
-            members_count = sum(1 for r in members_rows if r.find_all("td"))
-            return jsonify({
-                "name": name, "type": "guild", 
-                "members": members_count, "url": url
-            })
-        else:
-            table = soup.find("table")
-            if not table:
-                return jsonify({"error": "Данные персонажа скрыты или отсутствуют"}), 404
-            
-            data = {}
-            for tr in table.find_all("tr"):
-                td = tr.find_all("td")
-                if len(td) == 2:
-                    data[td[0].text.strip()] = td[1].text.strip()
-            
-            return jsonify({
-                "name": data.get('Name', name),
-                "level": data.get('Level', '?'),
-                "guild": data.get('Guild', 'None'),
-                "online": data.get('Last online', '?'),
-                "type": "player",
-                "url": url
-            })
+    r = requests.get(url, headers=HEADERS, timeout=5)
+    if r.status_code != 200:
+        return jsonify({"error": "Не найдено"}), 404
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    if stype == "guild":
+        rows = soup.find_all("tr")
+        members = sum(1 for r in rows if r.find_all("td"))
+        return jsonify({
+            "type": "guild",
+            "name": name,
+            "members": members,
+            "url": url
+        })
+
+    table = soup.find("table")
+    if not table:
+        return jsonify({"error": "Персонаж скрыт"}), 404
+
+    data = {}
+    for tr in table.find_all("tr"):
+        td = tr.find_all("td")
+        if len(td) == 2:
+            data[td[0].text.strip()] = td[1].text.strip()
+
+    return jsonify({
+        "type": "player",
+        "name": data.get("Name", name),
+        "level": data.get("Level", "?"),
+        "guild": data.get("Guild", "None"),
+        "online": data.get("Last online", "?"),
+        "url": url
+    })
 
     except Exception as e:
         print(f"Ошибка API: {e}")
