@@ -148,90 +148,59 @@ def home():
 @app.route('/api/search')
 def api_search():
     try:
-        # 1. Получаем данные из запроса сайта
-        name_raw = request.args.get('name', '').strip()
-        stype = request.args.get('type', 'player')
-
-        if not name_raw:
-            return jsonify({"error": "Введите имя!"}), 400
-
-        # 2. Формируем правильный URL для Rucoy Online
-        # Пробелы заменяем на %20, чтобы ссылка была валидной
-        name_for_url = name_raw.replace(" ", "%20")
+        name = request.args.get('name')
+        stype = request.args.get('type')
         
+        if not name:
+            return jsonify({"error": "Введите имя"}), 400
+
+        safe_name = quote(name)
+
         if stype == "guild":
-            url = f"https://www.rucoyonline.com/guild/{name_for_url}"
+            url = f"https://www.rucoyonline.com/guild/{safe_name}"
         else:
-            url = f"https://www.rucoyonline.com/player/{name_for_url}"
+            url = f"https://www.rucoyonline.com/characters/{safe_name}"
 
-        # 3. Заголовки, чтобы сайт не блокировал бота
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        # 4. Запрос к сайту Rucoy
-        r = requests.get(url, headers=headers, timeout=10)
+        r = requests.get(url, headers=HEADERS, timeout=5)
         
-        if r.status_code == 404:
-            return jsonify({"error": f"{'Клан' if stype == 'guild' else 'Игрок'} не найден"}), 404
+        if r.status_code != 200:
+            return jsonify({"error": "Не найдено на Rucoy Online"}), 404
 
         soup = BeautifulSoup(r.text, "html.parser")
         
         if stype == "guild":
-            # --- ПАРСИНГ КЛАНА ---
-            tables = soup.find_all("table")
-            if not tables:
-                return jsonify({"error": "Ошибка парсинга данных клана"}), 500
-            
-            # Первая таблица: Название, Описание, Дата создания
-            clan_info = {}
-            for tr in tables[0].find_all("tr"):
-                tds = tr.find_all("td")
-                if len(tds) == 2:
-                    key = tds[0].text.strip().lower()
-                    val = tds[1].text.strip()
-                    clan_info[key] = val
-            
-            # Вторая таблица: Список участников (считаем строки)
-            members_count = 0
-            if len(tables) > 1:
-                # Вычитаем 1, так как первая строка — это заголовки таблицы
-                members_count = len(tables[1].find_all("tr")) - 1
-
+            members_rows = soup.find_all("tr")
+            members_count = sum(1 for r in members_rows if r.find_all("td"))
             return jsonify({
-                "name": name_raw.title(),
-                "type": "guild",
-                "members": members_count,
-                "description": clan_info.get("description", "Описание не заполнено"),
-                "created_at": clan_info.get("created", "Неизвестно"),
-                "url": url
+                "name": name, "type": "guild", 
+                "members": members_count, "url": url
             })
-            
         else:
-            # --- ПАРСИНГ ИГРОКА ---
             table = soup.find("table")
             if not table:
-                return jsonify({"error": "Данные игрока скрыты или не найдены"}), 404
+                return jsonify({"error": "Данные персонажа скрыты или отсутствуют"}), 404
             
-            p_data = {}
+            data = {}
             for tr in table.find_all("tr"):
-                tds = tr.find_all("td")
-                if len(tds) == 2:
-                    p_data[tds[0].text.strip()] = tds[1].text.strip()
-
+                td = tr.find_all("td")
+                if len(td) == 2:
+                    data[td[0].text.strip()] = td[1].text.strip()
+            
             return jsonify({
-                "name": p_data.get('Name', name_raw),
-                "level": p_data.get('Level', 'N/A'),
-                "guild": p_data.get('Guild', 'Без гильдии'),
-                "online": p_data.get('Last online', 'Неизвестно'),
-                "born": p_data.get('Born', 'Неизвестно'),
+                "name": data.get('Name', name),
+                "level": data.get('Level', '?'),
+                "guild": data.get('Guild', 'None'),
+                "online": data.get('Last online', '?'),
                 "type": "player",
                 "url": url
             })
 
     except Exception as e:
-        print(f"Ошибка в api_search: {e}")
-        return jsonify({"error": "Ошибка на стороне сервера"}), 500
+        print(f"Ошибка API: {e}")
+        return jsonify({"error": f"Internal error: {str(e)}"}), 500
+
+# Функции keep_alive и run_web_server здесь больше не нужны, 
+# мы запустим Flask правильно в самом низу файла.
 # ---------------- PARSING ----------------
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
