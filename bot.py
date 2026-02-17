@@ -139,7 +139,7 @@ def save_scammers(data):
 
 # ---------------- RENDER & API SETTINGS ----------------
 app = Flask('')
-CORS(app)  # <--- ДОБАВЬ ЭТУ СТРОКУ! Без неё сайт не сможет делать запросы к боту.
+CORS(app)
 
 @app.route('/')
 def home():
@@ -147,69 +147,85 @@ def home():
 
 @app.route('/api/search', methods=['GET'])
 def api_search():
-    name = request.args.get('name', '').strip()
-    stype = request.args.get('type', 'player')
+    try:
+        name = request.args.get('name', '').strip()
+        stype = request.args.get('type', 'player')
 
-    if not name:
-        return jsonify({"error": "Введите имя"}), 400
+        if not name:
+            return jsonify({"error": "Введите имя"}), 400
 
-    safe_name = quote(name)
+        safe_name = quote(name)
+        url = (
+            f"https://www.rucoyonline.com/guild/{safe_name}"
+            if stype == "guild"
+            else f"https://www.rucoyonline.com/characters/{safe_name}"
+        )
 
-    url = (
-        f"https://www.rucoyonline.com/guild/{safe_name}"
-        if stype == "guild"
-        else f"https://www.rucoyonline.com/characters/{safe_name}"
-    )
+        r = requests.get(url, headers=HEADERS, timeout=5)
 
-    r = requests.get(url, headers=HEADERS, timeout=5)
-    if r.status_code != 200:
-        return jsonify({"error": "Не найдено"}), 404
+        if r.status_code != 200:
+            return jsonify({"error": "Не найдено"}), 404
 
-    soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(r.text, "html.parser")
 
-    if stype == "guild":
-        rows = soup.find_all("tr")
-        members = sum(1 for r in rows if r.find_all("td"))
+        # ── GUILD ──────────────────────────────────────────
+        if stype == "guild":
+            rows = soup.find_all("tr")
+            members = sum(1 for row in rows if row.find_all("td"))
+
+            # Дата создания
+            created_at = "Неизвестно"
+            text = soup.get_text("\n", strip=True)
+            m = re.search(r"Founded on[:\s]+(.+)", text, re.I)
+            if m:
+                created_at = m.group(1).strip()
+
+            # Описание гильдии
+            description = extract_description(soup, name)
+
+            return jsonify({
+                "type": "guild",
+                "name": name,
+                "members": members,
+                "created_at": created_at,
+                "description": description,
+                "url": url
+            })
+
+        # ── PLAYER ─────────────────────────────────────────
+        table = soup.find("table")
+        if not table:
+            return jsonify({"error": "Персонаж скрыт или не существует"}), 404
+
+        data = {}
+        for tr in table.find_all("tr"):
+            td = tr.find_all("td")
+            if len(td) == 2:
+                data[td[0].text.strip()] = td[1].text.strip()
+
         return jsonify({
-            "type": "guild",
-            "name": name,
-            "members": members,
+            "type": "player",
+            "name": data.get("Name", name),
+            "level": data.get("Level", "?"),
+            "guild": data.get("Guild", "None"),
+            "online": data.get("Last online", "?"),
+            "born": data.get("Born", ""),          # ← ДОБАВЛЕНО
             "url": url
         })
-
-    table = soup.find("table")
-    if not table:
-        return jsonify({"error": "Персонаж скрыт"}), 404
-
-    data = {}
-    for tr in table.find_all("tr"):
-        td = tr.find_all("td")
-        if len(td) == 2:
-            data[td[0].text.strip()] = td[1].text.strip()
-
-    return jsonify({
-        "type": "player",
-        "name": data.get("Name", name),
-        "level": data.get("Level", "?"),
-        "guild": data.get("Guild", "None"),
-        "online": data.get("Last online", "?"),
-        "url": url
-    })
 
     except Exception as e:
         print(f"Ошибка API: {e}")
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
-# Функции keep_alive и run_web_server здесь больше не нужны, 
-# мы запустим Flask правильно в самом низу файла.
+
 # ---------------- PARSING ----------------
 HEADERS = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
 MENU_WORDS = {
-    "le navigation","rucoy online","welcome","news","highscores",
-    "characters","guilds","sign in","sign in with google","sign in with apple"
+    "le navigation", "rucoy online", "welcome", "news", "highscores",
+    "characters", "guilds", "sign in", "sign in with google", "sign in with apple"
 }
 
 def remove_adjacent_duplicates(lines):
@@ -221,8 +237,8 @@ def remove_adjacent_duplicates(lines):
 
 def remove_repeated_block(lines):
     n = len(lines)
-    for k in range(1, n//2 + 1):
-        if lines[:k] == lines[k:2*k]:
+    for k in range(1, n // 2 + 1):
+        if lines[:k] == lines[k:2 * k]:
             return lines[k:]
     return lines
 
@@ -237,7 +253,6 @@ def extract_description(soup, name):
         chunk = text[start:end]
     if not chunk:
         return "Нет описания"
-
     lines = [l.strip() for l in chunk.split("\n") if l.strip()]
     lines = [l for l in lines if not any(m in l.lower() for m in MENU_WORDS)]
     lines = remove_adjacent_duplicates(lines)
